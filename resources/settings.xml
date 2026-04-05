@@ -2,8 +2,9 @@
 <settings>
     <category label="Reprodução automática">
         <setting id="autoplay" type="bool" label="Ativar reprodução automática" default="false"/>
+        <setting id="autoplay_pref" type="enum" label="Preferência de áudio" values="Dublado|Legendado" default="0" enable="eq(-1,true)"/>
     </category>
-    
+
     <category label="Resolve url">
         <setting id="update_resolveurl" type="action" label="Atualizar ResolveURL" action="RunScript(special://home/addons/plugin.video.doramasplus/lib/resolveurl.py,update)"/>
     </category>
