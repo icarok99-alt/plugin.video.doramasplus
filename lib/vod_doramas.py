@@ -55,7 +55,6 @@ def _clean_url(url):
     except Exception:
         return url.strip()
 
-
 def _decode_holuagency(url):
     if not url:
         return url
@@ -65,13 +64,11 @@ def _decode_holuagency(url):
         if 'holuagency' not in cleaned:
             return _clean_url(cleaned)
 
-        # try ?url= / &url= param first
         parsed = urlparse(cleaned)
         qs = parse_qs(parsed.query)
 
         if 'url' in qs:
             inner = unquote(qs['url'][0])
-            # inner may itself be base64
             try:
                 decoded = base64.b64decode(inner + '==').decode('utf-8', errors='ignore')
                 if decoded.startswith('http'):
@@ -81,7 +78,6 @@ def _decode_holuagency(url):
             if inner.startswith('http'):
                 return _clean_url(inner)
 
-        # try path segments that look like base64
         for segment in parsed.path.strip('/').split('/'):
             if len(segment) > 20:
                 try:
@@ -92,7 +88,6 @@ def _decode_holuagency(url):
                 except Exception:
                     pass
 
-        # try extracting any http url from the raw string
         match = re.search(r'https?://(?!holuagency)[^\s&"\']+', cleaned)
         if match:
             return _clean_url(match.group(0))
@@ -100,7 +95,6 @@ def _decode_holuagency(url):
         return _clean_url(cleaned)
     except Exception:
         return url.strip()
-
 
 def _get_players(page_url):
     players = []
@@ -125,10 +119,18 @@ def _get_players(page_url):
             nume = m.group(1) if m else None
             name = nomes_por_nume.get(nume, f'Opção {nume}') if nume else 'Player'
 
+            # Filtro forte contra trailer
+            name_lower = name.lower()
+            if 'trailer' in name_lower or 'youtube' in name_lower or 'preview' in name_lower:
+                continue
+
             a = box.find('a', href=True)
             if a and a.get('href'):
                 url = _decode_holuagency(a['href'])
                 if url:
+                    url_lower = url.lower()
+                    if 'youtube' in url_lower or 'trailer' in url_lower:
+                        continue
                     players.append((name, url))
                 continue
 
@@ -136,19 +138,25 @@ def _get_players(page_url):
             if iframe and iframe.get('src'):
                 url = _decode_holuagency(iframe['src'])
                 if url:
+                    url_lower = url.lower()
+                    if 'youtube' in url_lower or 'trailer' in url_lower:
+                        continue
                     players.append((name, url))
 
+        # Fallback caso não encontre players pelo método principal
         if not players:
             for i, iframe in enumerate(soup.find_all('iframe', src=True), 1):
                 url = _decode_holuagency(iframe.get('src', ''))
                 if url:
-                    players.append((f'Player {i}', url))
+                    url_lower = url.lower()
+                    if 'youtube' not in url_lower and 'trailer' not in url_lower:
+                        players.append((f'Player {i}', url))
 
     except Exception:
         pass
     return players
 
-def _search_serie(title):
+def _search_content(title, is_movie=False):
     if not title:
         return None
     try:
@@ -163,21 +171,31 @@ def _search_serie(title):
 
         for item in soup.find_all(['div', 'article'], class_=lambda x: x and any(c in (x or '') for c in ['result-item', 'post', 'item'])):
             a = item.find('a', href=True)
-            if not a: continue
+            if not a: 
+                continue
             href = a.get('href', '')
             title_tag = item.find(['h3', 'div.title', 'h2']) or a
             found_title = title_tag.get_text(strip=True) if title_tag else ''
 
-            if not found_title or any(x in found_title.lower() for x in ['related', 'recomendado', 'sugestão', 'sequel', 'season 2', 'temporada 2']):
+            if not found_title:
                 continue
 
-            score = 90 if any(x in found_title.lower() for x in ['class 1', 'season 1', 'temporada 1']) else 0
+            if any(x in found_title.lower() for x in ['related', 'recomendado', 'sugestão', 'sequel', 'temporada 2']):
+                continue
+
+            score = 0
             if title.lower() in found_title.lower() or found_title.lower().startswith(title.lower()):
-                score += 100
-            else:
-                for kw in keywords:
-                    if len(kw) > 3 and kw in found_title.lower():
-                        score += 25
+                score += 120
+
+            for kw in keywords:
+                if len(kw) > 3 and kw in found_title.lower():
+                    score += 35
+
+            if is_movie:
+                if any(x in href.lower() for x in ['/filmes/', '/filme/']):
+                    score += 80
+                if any(x in found_title.lower() for x in ['filme', 'movie']):
+                    score += 40
 
             if score > 0:
                 candidates.append((score, found_title, href))
@@ -186,7 +204,8 @@ def _search_serie(title):
             candidates.sort(key=lambda x: x[0], reverse=True)
             return candidates[0][2]
 
-        first = soup.find('a', href=lambda h: h and ('/serie/' in h or '/series/' in h or '/temporada/' in h or '/filme/' in h))
+        selector = '/filmes/' if is_movie else '/serie/|/series/|/temporada/'
+        first = soup.find('a', href=lambda h: h and re.search(selector, h))
         if first:
             return first['href']
     except Exception:
@@ -196,11 +215,10 @@ def _search_serie(title):
 MDL_BASE = 'https://mydramalist.com/'
 
 def _get_english_title(mdl_id):
-    """Busca o título em inglês na página do MyDramaList usando lang en-US."""
     if not mdl_id:
         return ''
     try:
-        url = f'{MDL_BASE}{mdl_id}?lang=en-US'
+        url = f'{MDL_BASE}{mdl_id.lstrip("/")}?lang=en-US'
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
             'Accept-Language': 'en-US,en;q=0.9',
@@ -210,12 +228,10 @@ def _get_english_title(mdl_id):
             return ''
         soup = BeautifulSoup(r.text, 'html.parser')
 
-        # título principal em inglês (h1 ou itemprop=name)
         h1 = soup.select_one('h1.film-title, h1[itemprop="name"]')
         if h1:
             return h1.get_text(strip=True)
 
-        # fallback: <title> da página
         t = soup.find('title')
         if t:
             return t.get_text(strip=True).split('|')[0].strip()
@@ -223,13 +239,12 @@ def _get_english_title(mdl_id):
         pass
     return ''
 
-
 class VOD:
     def tvshow(self, title=None, mdl_id='', season=1, episode=1):
         if not title:
             return []
         english = _get_english_title(mdl_id)
-        serie_url = (english and _search_serie(english)) or _search_serie(title)
+        serie_url = (english and _search_content(english)) or _search_content(title)
         if not serie_url:
             return []
 
@@ -263,7 +278,7 @@ class VOD:
         if not title:
             return []
         english = _get_english_title(mdl_id)
-        movie_url = (english and _search_serie(english)) or _search_serie(title)
+        movie_url = (english and _search_content(english, is_movie=True)) or _search_content(title, is_movie=True)
         if not movie_url:
             return []
         return _get_players(movie_url)
