@@ -2,6 +2,7 @@
 from lib.helper import *
 from lib import mydramalist, vod_doramas
 from lib.resolver import Resolver
+from lib.proxy import get_proxy
 
 if not exists(profile):
     try:
@@ -52,24 +53,16 @@ def _play(result, title, iconimage, fanart, description, media_type, season=None
     if '|sub=' in result:
         result, sub = result.split('|sub=', 1)
 
-    url = result.split('|')[0] if '|' in result else result
-    headers = result.split('|', 1)[1] if '|' in result else ''
+    proxy = get_proxy()
+    if proxy:
+        play_url = proxy.get_proxy_url(result)
+    else:
+        play_url = result.split('|')[0] if '|' in result else result
 
-    is_direct = url.lower().endswith(('.mp4', '.mkv', '.avi', '.mov', '.webm', '.ts'))
-
-    play_item = xbmcgui.ListItem(label=title, path=url)
+    play_item = xbmcgui.ListItem(label=title, path=play_url)
     play_item.setArt({'thumb': iconimage, 'icon': iconimage, 'fanart': fanart or iconimage})
     play_item.setContentLookup(False)
-
-    if is_direct:
-        play_item.setMimeType('video/mp4')
-        if headers:
-            play_item.setPath(f'{url}|{headers}')
-    else:
-        play_item.setProperty('inputstream', 'inputstream.adaptive')
-        play_item.setProperty('inputstream.adaptive.manifest_type', 'hls')
-        if headers:
-            play_item.setProperty('inputstream.adaptive.stream_headers', headers)
+    play_item.setMimeType('video/mp4')
 
     if sub:
         play_item.setSubtitles([sub])
@@ -137,6 +130,11 @@ def menu_filmes(param=None):
     addMenuItem({'name': 'FILMES POPULARES', 'description': '[B]Os filmes asiáticos mais acessados no momento — veja o que está em alta.[/B]', 'iconimage': translate(os.path.join(homeDir, 'resources', 'images', 'popular.jpg'))}, destiny='/filmes_popular')
     end()
 
+def _mdl_id(url):
+    import re as _re
+    m = _re.search(r'/(\d+)-', url or '')
+    return m.group(1) if m else ''
+
 def _render_dramas(items, page, next_destiny):
     if not items:
         notify('Nenhum item disponível')
@@ -146,7 +144,7 @@ def _render_dramas(items, page, next_destiny):
         label = f'{title} ({year})' if year else title
         if score:
             label = f'[COLOR gold]★ {score}[/COLOR]  {label}'
-        addMenuItem({'name': label, 'description': f'{info}\n\n{description}'.strip(), 'iconimage': img, 'url': url, 'title': title, 'year': year}, destiny='/open_episodes_mdl')
+        addMenuItem({'name': label, 'description': f'{info}\n\n{description}'.strip(), 'iconimage': img, 'url': url, 'mdl_id': _mdl_id(url), 'title': title, 'year': year}, destiny='/open_episodes_mdl')
     addMenuItem({'name': 'Próxima página', 'iconimage': translate(os.path.join(homeDir, 'resources', 'images', 'next.jpg')), 'page': page + 1}, destiny=next_destiny)
     end()
 
@@ -159,7 +157,7 @@ def _render_movies(items, page, next_destiny):
         label = f'{title} ({year})' if year else title
         if score:
             label = f'[COLOR gold]★ {score}[/COLOR]  {label}'
-        addMenuItem({'name': label, 'description': f'{info}\n\n{description}'.strip(), 'iconimage': img, 'url': url, 'title': title, 'year': year, 'playable': True}, destiny='/play_filme', folder=False)
+        addMenuItem({'name': label, 'description': f'{info}\n\n{description}'.strip(), 'iconimage': img, 'url': url, 'mdl_id': _mdl_id(url), 'title': title, 'year': year, 'playable': True}, destiny='/play_filme', folder=False)
     addMenuItem({'name': 'Próxima página', 'iconimage': translate(os.path.join(homeDir, 'resources', 'images', 'next.jpg')), 'page': page + 1}, destiny=next_destiny)
     end()
 
@@ -189,7 +187,7 @@ def search_doramas(param=None):
     for title, img, url, description, score, info, year in items:
         label = f'{title} ({year})' if year else title
         if score: label = f'[COLOR gold]★ {score}[/COLOR]  {label}'
-        addMenuItem({'name': label, 'description': f'{info}\n\n{description}'.strip(), 'iconimage': img, 'url': url, 'title': title, 'year': year}, destiny='/open_episodes_mdl')
+        addMenuItem({'name': label, 'description': f'{info}\n\n{description}'.strip(), 'iconimage': img, 'url': url, 'mdl_id': _mdl_id(url), 'title': title, 'year': year}, destiny='/open_episodes_mdl')
     end()
 
 @route('/filmes_top')
@@ -218,7 +216,7 @@ def search_filmes(param=None):
     for title, img, url, description, score, info, year in items:
         label = f'{title} ({year})' if year else title
         if score: label = f'[COLOR gold]★ {score}[/COLOR]  {label}'
-        addMenuItem({'name': label, 'description': f'{info}\n\n{description}'.strip(), 'iconimage': img, 'url': url, 'title': title, 'year': year, 'playable': True}, destiny='/play_filme', folder=False)
+        addMenuItem({'name': label, 'description': f'{info}\n\n{description}'.strip(), 'iconimage': img, 'url': url, 'mdl_id': _mdl_id(url), 'title': title, 'year': year, 'playable': True}, destiny='/play_filme', folder=False)
     end()
 
 @route('/open_episodes_mdl')
@@ -226,6 +224,7 @@ def open_episodes_mdl(param):
     serie_title = param.get('title', param.get('name', ''))
     serie_img = param.get('iconimage', '')
     mdl_url = param.get('url', '')
+    mdl_id = param.get('mdl_id', '')
     year = param.get('year', '')
 
     if not mdl_url:
@@ -241,7 +240,7 @@ def open_episodes_mdl(param):
     for ep_num, ep_title, ep_img, ep_desc, air_date, ep_score in episodes:
         label = f'[COLOR gold]★ {ep_score}[/COLOR]  {ep_title}' if ep_score else ep_title
         desc = '\n'.join(filter(None, [air_date, ep_desc]))
-        addMenuItem({'name': label, 'description': desc, 'iconimage': ep_img or serie_img, 'serie_title': serie_title, 'episode_num': str(ep_num), 'episode_title': ep_title, 'year': year, 'playable': True}, destiny='/play_dorama', folder=False)
+        addMenuItem({'name': label, 'description': desc, 'iconimage': ep_img or serie_img, 'serie_title': serie_title, 'episode_num': str(ep_num), 'episode_title': ep_title, 'year': year, 'mdl_id': mdl_id, 'playable': True}, destiny='/play_dorama', folder=False)
     end()
 
 @route('/play_dorama')
@@ -253,10 +252,11 @@ def play_dorama(param):
     fanart = param.get('fanart', '')
     description = param.get('description', '')
     year = param.get('year', '')
+    mdl_id = param.get('mdl_id', '')
 
     notify('PROCURANDO NA FONTE...')
 
-    players = vod_doramas.VOD().tvshow(title=serie_title, season=1, episode=episode_num)
+    players = vod_doramas.VOD().tvshow(title=serie_title, mdl_id=mdl_id, season=1, episode=episode_num)
     if not players:
         notify('Nenhum player encontrado')
         return
@@ -301,10 +301,11 @@ def play_filme(param):
     fanart = param.get('fanart', '')
     description = param.get('description', '')
     year = param.get('year', '')
+    mdl_id = param.get('mdl_id', '')
 
     notify('PROCURANDO NA FONTE...')
 
-    players = vod_doramas.VOD().movie(title=title)
+    players = vod_doramas.VOD().movie(title=title, mdl_id=mdl_id)
     if not players:
         notify('Nenhum player encontrado')
         return
