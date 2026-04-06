@@ -1,6 +1,5 @@
 import re
 import base64
-import json
 from urllib.parse import urlparse, parse_qs, unquote
 from bs4 import BeautifulSoup
 import cloudscraper
@@ -22,7 +21,7 @@ def _get(url, timeout=20):
     try:
         r = _scraper.get(url, headers=HEADERS, timeout=timeout)
         return r.text if r.status_code == 200 else None
-    except Exception as e:
+    except Exception:
         return None
 
 def _soup(html):
@@ -31,46 +30,77 @@ def _soup(html):
 def _clean_url(url):
     if not url:
         return url
-
-    original = url[:300]
-
     try:
         cleaned = url.strip()
 
         if 'q1n.net/off/?url=' in cleaned:
-            cleaned = cleaned.split('q1n.net/off/?url=')[1]
-            cleaned = unquote(cleaned.split('&')[0])
-
+            cleaned = unquote(cleaned.split('q1n.net/off/?url=')[1].split('&')[0])
         elif 'rogeriobetin.com' in cleaned:
             if '/noance/?' in cleaned:
                 part = cleaned.split('/noance/?')[1]
                 cleaned = 'https://rogeriobetin.com/noance/?' + unquote(part.split('&')[0] if '&' in part else part)
 
-        if any(x in cleaned for x in ['/off/?url=', '/out/?url=', '/go/?url=']):
-            for param in ['/off/?url=', '/out/?url=', '/go/?url=']:
-                if param in cleaned:
-                    cleaned = unquote(cleaned.split(param)[-1].split('&')[0])
-                    break
+        for param in ['/off/?url=', '/out/?url=', '/go/?url=']:
+            if param in cleaned:
+                cleaned = unquote(cleaned.split(param)[-1].split('&')[0])
+                break
 
-        dirty = ['&img=', '&poster=', '&token=', '&expires=', '&signature=', '&type=', 
+        dirty = ['&img=', '&poster=', '&token=', '&expires=', '&signature=', '&type=',
                  '&sub=', '&lang=', '&referer=', '&domain=', '&t=', '&v=', '&player=', '&amp;']
-
         for d in dirty:
             if d in cleaned:
                 cleaned = cleaned.split(d)[0]
 
-        cleaned = cleaned.rstrip('&?')
-
-        return cleaned.strip()
-
-    except Exception as e:
+        return cleaned.rstrip('&?').strip()
+    except Exception:
         return url.strip()
+
 
 def _decode_holuagency(url):
+    if not url:
+        return url
     try:
-        return _clean_url(url)
-    except:
+        cleaned = url.strip()
+
+        if 'holuagency' not in cleaned:
+            return _clean_url(cleaned)
+
+        # try ?url= / &url= param first
+        parsed = urlparse(cleaned)
+        qs = parse_qs(parsed.query)
+
+        if 'url' in qs:
+            inner = unquote(qs['url'][0])
+            # inner may itself be base64
+            try:
+                decoded = base64.b64decode(inner + '==').decode('utf-8', errors='ignore')
+                if decoded.startswith('http'):
+                    return _clean_url(decoded)
+            except Exception:
+                pass
+            if inner.startswith('http'):
+                return _clean_url(inner)
+
+        # try path segments that look like base64
+        for segment in parsed.path.strip('/').split('/'):
+            if len(segment) > 20:
+                try:
+                    padding = segment + '=' * (-len(segment) % 4)
+                    decoded = base64.b64decode(padding).decode('utf-8', errors='ignore')
+                    if decoded.startswith('http'):
+                        return _clean_url(decoded)
+                except Exception:
+                    pass
+
+        # try extracting any http url from the raw string
+        match = re.search(r'https?://(?!holuagency)[^\s&"\']+', cleaned)
+        if match:
+            return _clean_url(match.group(0))
+
+        return _clean_url(cleaned)
+    except Exception:
         return url.strip()
+
 
 def _get_players(page_url):
     players = []
@@ -97,16 +127,22 @@ def _get_players(page_url):
 
             a = box.find('a', href=True)
             if a and a.get('href'):
-                players.append((name, _decode_holuagency(a['href'].strip())))
+                url = _decode_holuagency(a['href'])
+                if url:
+                    players.append((name, url))
                 continue
 
             iframe = box.find('iframe', src=True)
             if iframe and iframe.get('src'):
-                players.append((name, _decode_holuagency(iframe['src'].strip())))
+                url = _decode_holuagency(iframe['src'])
+                if url:
+                    players.append((name, url))
 
         if not players:
             for i, iframe in enumerate(soup.find_all('iframe', src=True), 1):
-                players.append((f'Player {i}', _decode_holuagency(iframe.get('src', ''))))
+                url = _decode_holuagency(iframe.get('src', ''))
+                if url:
+                    players.append((f'Player {i}', url))
 
     except Exception:
         pass
@@ -153,15 +189,47 @@ def _search_serie(title):
         first = soup.find('a', href=lambda h: h and ('/serie/' in h or '/series/' in h or '/temporada/' in h or '/filme/' in h))
         if first:
             return first['href']
-    except:
+    except Exception:
         pass
     return None
 
+MDL_BASE = 'https://mydramalist.com/'
+
+def _get_english_title(mdl_id):
+    """Busca o título em inglês na página do MyDramaList usando lang en-US."""
+    if not mdl_id:
+        return ''
+    try:
+        url = f'{MDL_BASE}{mdl_id}?lang=en-US'
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            'Accept-Language': 'en-US,en;q=0.9',
+        }
+        r = _scraper.get(url, headers=headers, timeout=15, allow_redirects=True)
+        if r.status_code != 200:
+            return ''
+        soup = BeautifulSoup(r.text, 'html.parser')
+
+        # título principal em inglês (h1 ou itemprop=name)
+        h1 = soup.select_one('h1.film-title, h1[itemprop="name"]')
+        if h1:
+            return h1.get_text(strip=True)
+
+        # fallback: <title> da página
+        t = soup.find('title')
+        if t:
+            return t.get_text(strip=True).split('|')[0].strip()
+    except Exception:
+        pass
+    return ''
+
+
 class VOD:
-    def tvshow(self, title=None, fallback='', season=1, episode=1):
+    def tvshow(self, title=None, mdl_id='', season=1, episode=1):
         if not title:
             return []
-        serie_url = _search_serie(title) or (fallback and _search_serie(fallback))
+        english = _get_english_title(mdl_id)
+        serie_url = (english and _search_serie(english)) or _search_serie(title)
         if not serie_url:
             return []
 
@@ -185,16 +253,17 @@ class VOD:
 
         if not target:
             try:
-                target = episodios[episode-1].select_one('a')['href']
-            except:
+                target = episodios[episode - 1].select_one('a')['href']
+            except Exception:
                 return []
 
         return _get_players(target)
 
-    def movie(self, title=None, fallback=''):
+    def movie(self, title=None, mdl_id=''):
         if not title:
             return []
-        movie_url = _search_serie(title) or (fallback and _search_serie(fallback))
+        english = _get_english_title(mdl_id)
+        movie_url = (english and _search_serie(english)) or _search_serie(title)
         if not movie_url:
             return []
         return _get_players(movie_url)
