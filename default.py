@@ -132,7 +132,7 @@ def menu_filmes(param=None):
 
 def _mdl_id(url):
     import re as _re
-    m = _re.search(r'/(\d+)-', url or '')
+    m = _re.search(r'mydramalist\.com/([^/?#]+)', url or '')
     return m.group(1) if m else ''
 
 def _render_dramas(items, page, next_destiny):
