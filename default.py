@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import re
 from lib.helper import *
 from lib import mydramalist, vod_doramas
 from lib.resolver import Resolver
@@ -131,9 +132,29 @@ def menu_filmes(param=None):
     end()
 
 def _mdl_id(url):
-    import re as _re
-    m = _re.search(r'mydramalist\.com/([^/?#]+)', url or '')
+    m = re.search(r'mydramalist\.com/([^/?#]+)', url or '')
     return m.group(1) if m else ''
+
+def _detect_season(text):
+    """Detecta o número da temporada a partir do título da série."""
+    if not text:
+        return 1
+    patterns = [
+        r'\bseason\s*(\d+)\b',
+        r'\b(\d+)(?:st|nd|rd|th)\s*season\b',
+        r'\bs(\d+)\b',
+        r'(\d+)[aª°]\s*temporada',
+        r'\btemporada\s*(\d+)\b',
+        r'\bpart\s*(\d+)\b',
+        r'\bparte\s*(\d+)\b',
+        r'\b(\d+)\s*:',
+    ]
+    for p in patterns:
+        m = re.search(p, text, re.IGNORECASE)
+        if m:
+            n = int(m.group(1))
+            return n if n > 0 else 1
+    return 1
 
 def _render_dramas(items, page, next_destiny):
     if not items:
@@ -236,11 +257,13 @@ def open_episodes_mdl(param):
         notify('Nenhum episódio encontrado')
         return
 
+    season = _detect_season(serie_title)
+
     setcontent('episodes')
     for ep_num, ep_title, ep_img, ep_desc, air_date, ep_score in episodes:
         label = f'[COLOR gold]★ {ep_score}[/COLOR]  {ep_title}' if ep_score else ep_title
         desc = '\n'.join(filter(None, [air_date, ep_desc]))
-        addMenuItem({'name': label, 'description': desc, 'iconimage': ep_img or serie_img, 'serie_title': serie_title, 'episode_num': str(ep_num), 'episode_title': ep_title, 'year': year, 'mdl_id': mdl_id, 'playable': True}, destiny='/play_dorama', folder=False)
+        addMenuItem({'name': label, 'description': desc, 'iconimage': ep_img or serie_img, 'serie_title': serie_title, 'episode_num': str(ep_num), 'episode_title': ep_title, 'year': year, 'mdl_id': mdl_id, 'season': str(season), 'playable': True}, destiny='/play_dorama', folder=False)
     end()
 
 @route('/play_dorama')
@@ -253,10 +276,11 @@ def play_dorama(param):
     description = param.get('description', '')
     year = param.get('year', '')
     mdl_id = param.get('mdl_id', '')
+    season = int(param.get('season', _detect_season(serie_title)))
 
     notify('PROCURANDO NA FONTE...')
 
-    players = vod_doramas.VOD().tvshow(title=serie_title, mdl_id=mdl_id, season=1, episode=episode_num)
+    players = vod_doramas.VOD().tvshow(title=serie_title, mdl_id=mdl_id, season=season, episode=episode_num)
     if not players:
         notify('Nenhum player encontrado')
         return
