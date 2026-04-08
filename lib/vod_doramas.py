@@ -31,10 +31,21 @@ def _clean_url(url):
     if not url:
         return url
     try:
-        cleaned = url.strip()
-        if 'q1n.net/off/?url=' in cleaned:
-            cleaned = unquote(cleaned.split('q1n.net/off/?url=')[1].split('&')[0])
-        elif 'rogeriobetin.com' in cleaned:
+        cleaned = unquote(url.strip())
+        if 'doramasonline.org/aviso' in cleaned:
+            # Sempre parsear o URL *original* (ainda codificado) para evitar que
+            # urlparse confunda '%23' decodificado → '#' com fragmento da URL externa.
+            parsed = urlparse(url.strip())
+            qs = parse_qs(parsed.query)
+            if 'url' in qs:
+                inner = unquote(qs['url'][0])
+                # Fallback: se o URL já chegou decodificado, urlparse move o token
+                # do vídeo (#hidze) para parsed.fragment. Recuperamos aqui.
+                if parsed.fragment:
+                    frag_token = parsed.fragment.split('&')[0]
+                    inner = inner.rstrip('/') + '/#' + frag_token
+                return _clean_url(inner)
+        if 'rogeriobetin.com' in cleaned:
             if '/noance/?' in cleaned:
                 part = cleaned.split('/noance/?')[1]
                 cleaned = 'https://rogeriobetin.com/noance/?' + unquote(part.split('&')[0] if '&' in part else part)
@@ -42,8 +53,7 @@ def _clean_url(url):
             if param in cleaned:
                 cleaned = unquote(cleaned.split(param)[-1].split('&')[0])
                 break
-        dirty = ['&img=', '&poster=', '&token=', '&expires=', '&signature=', '&type=',
-                 '&sub=', '&lang=', '&referer=', '&domain=', '&t=', '&v=', '&player=', '&amp;']
+        dirty = ['&img=', '&poster=', '&amp;']
         for d in dirty:
             if d in cleaned:
                 cleaned = cleaned.split(d)[0]
