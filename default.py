@@ -101,8 +101,8 @@ def _play(result, title, iconimage, fanart, description, media_type, season=None
 @route('/')
 def index():
     setcontent('videos')
-    addMenuItem({'name': 'DORAMAS', 'description': '[B]Séries asiáticas legendadas e dubladas — doramas coreanos, japoneses, chineses e muito mais.[/B]', 'iconimage': translate(os.path.join(homeDir, 'resources', 'images', 'doramas.jpg'))}, destiny='/menu_doramas')
-    addMenuItem({'name': 'FILMES', 'description': '[B]Filmes asiáticos legendados e dublados — ação, romance, terror, fantasia e muito mais.[/B]', 'iconimage': translate(os.path.join(homeDir, 'resources', 'images', 'movies.jpg'))}, destiny='/menu_filmes')
+    addMenuItem({'name': 'DORAMAS', 'description': '[B]Séries asiáticas legendadas e dubladas - doramas coreanos, japoneses, chineses e muito mais.[/B]', 'iconimage': translate(os.path.join(homeDir, 'resources', 'images', 'doramas.jpg'))}, destiny='/menu_doramas')
+    addMenuItem({'name': 'FILMES', 'description': '[B]Filmes asiáticos legendados e dublados - ação, romance, terror, fantasia e muito mais.[/B]', 'iconimage': translate(os.path.join(homeDir, 'resources', 'images', 'movies.jpg'))}, destiny='/menu_filmes')
     addMenuItem({'name': 'CONFIGURAÇÕES', 'description': '[B]Ative a reprodução automática ou atualize o ResolveURL para manter os players funcionando.[/B]', 'iconimage': translate(os.path.join(homeDir, 'resources', 'images', 'settings.jpg'))}, destiny='/settings')
     addMenuItem({'name': 'DOAÇÃO', 'description': '[B]Gostou do add-on? Ajude o desenvolvedor a mantê-lo ativo com uma doação via PIX.[/B]', 'iconimage': translate(os.path.join(homeDir, 'resources', 'images', 'donate.jpg'))}, destiny='/donate')
     end()
@@ -119,16 +119,16 @@ def donate(param=None):
 def menu_doramas(param=None):
     setcontent('videos')
     addMenuItem({'name': 'PESQUISAR DORAMA', 'description': '[B]Digite o nome do dorama e encontre rapidamente a série que você procura.[/B]', 'iconimage': translate(os.path.join(homeDir, 'resources', 'images', 'search.jpg'))}, destiny='/search_doramas')
-    addMenuItem({'name': 'DORAMAS EM ALTA', 'description': '[B]Os doramas com as maiores notas — os queridinhos da audiência asiática.[/B]', 'iconimage': translate(os.path.join(homeDir, 'resources', 'images', 'trending.jpg'))}, destiny='/doramas_top')
-    addMenuItem({'name': 'DORAMAS POPULARES', 'description': '[B]Os doramas mais acessados no momento — veja o que todo mundo está assistindo.[/B]', 'iconimage': translate(os.path.join(homeDir, 'resources', 'images', 'popular.jpg'))}, destiny='/doramas_popular')
+    addMenuItem({'name': 'DORAMAS EM ALTA', 'description': '[B]Os doramas com as maiores notas - os queridinhos da audiência asiática.[/B]', 'iconimage': translate(os.path.join(homeDir, 'resources', 'images', 'trending.jpg'))}, destiny='/doramas_top')
+    addMenuItem({'name': 'DORAMAS POPULARES', 'description': '[B]Os doramas mais acessados no momento - veja o que todo mundo está assistindo.[/B]', 'iconimage': translate(os.path.join(homeDir, 'resources', 'images', 'popular.jpg'))}, destiny='/doramas_popular')
     end()
 
 @route('/menu_filmes')
 def menu_filmes(param=None):
     setcontent('videos')
     addMenuItem({'name': 'PESQUISAR FILME', 'description': '[B]Digite o nome do filme e encontre rapidamente o que você procura.[/B]', 'iconimage': translate(os.path.join(homeDir, 'resources', 'images', 'search.jpg'))}, destiny='/search_filmes')
-    addMenuItem({'name': 'FILMES EM ALTA', 'description': '[B]Os filmes asiáticos com as maiores notas — as melhores produções do cinema oriental.[/B]', 'iconimage': translate(os.path.join(homeDir, 'resources', 'images', 'trending.jpg'))}, destiny='/filmes_top')
-    addMenuItem({'name': 'FILMES POPULARES', 'description': '[B]Os filmes asiáticos mais acessados no momento — veja o que está em alta.[/B]', 'iconimage': translate(os.path.join(homeDir, 'resources', 'images', 'popular.jpg'))}, destiny='/filmes_popular')
+    addMenuItem({'name': 'FILMES EM ALTA', 'description': '[B]Os filmes asiáticos com as maiores notas - as melhores produções do cinema oriental.[/B]', 'iconimage': translate(os.path.join(homeDir, 'resources', 'images', 'trending.jpg'))}, destiny='/filmes_top')
+    addMenuItem({'name': 'FILMES POPULARES', 'description': '[B]Os filmes asiáticos mais acessados no momento - veja o que está em alta.[/B]', 'iconimage': translate(os.path.join(homeDir, 'resources', 'images', 'popular.jpg'))}, destiny='/filmes_popular')
     end()
 
 def _mdl_id(url):
