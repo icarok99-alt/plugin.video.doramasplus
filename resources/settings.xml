@@ -5,7 +5,25 @@
         <setting id="autoplay_pref" type="enum" label="Preferência de áudio" values="Dublado|Legendado" default="0" enable="eq(-1,true)"/>
     </category>
 
+    <category label="Próximo episódio (UpNext)">
+        <setting id="upnext_enabled" type="bool" label="Ativar aviso de próximo episódio" default="true"/>
+        <setting id="upnext_trigger" type="number" label="Segundos antes do fim para exibir" default="30" enable="eq(-2,true)"/>
+        <setting id="upnext_countdown" type="number" label="Contagem regressiva (segundos)" default="10" enable="eq(-3,true)"/>
+    </category>
+
+    <category label="Fontes">
+        <setting id="source_doramasonline" type="bool" label="Doramas Online" default="true"/>
+        <setting id="source_mydoramas" type="bool" label="My Doramas" default="true"/>
+    </category>
+
     <category label="Resolve url">
         <setting id="update_resolveurl" type="action" label="Atualizar ResolveURL" action="RunScript(special://home/addons/plugin.video.doramasplus/lib/resolveurl.py,update)"/>
     </category>
+
+    <category label="Banco de dados">
+        <setting id="db_auto_cleanup_enabled" type="bool" label="Limpeza automática" default="false"/>
+        <setting id="db_cleanup_days" type="number" label="Excluir após (dias)" default="7" enable="eq(-1,true)"/>
+        <setting id="db_manual_cleanup" type="action" label="Excluir banco de dados agora" action="RunScript(special://home/addons/plugin.video.doramasplus/lib/db_manager.py)"/>
+    </category>
+
 </settings>

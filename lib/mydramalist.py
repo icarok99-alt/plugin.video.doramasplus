@@ -9,15 +9,20 @@ except ImportError:
 from bs4 import BeautifulSoup
 from cloudscraper import create_scraper
 
+try:
+    from lib import db as _db
+except Exception:
+    _db = None
+
 MDL_BASE = 'https://mydramalist.com'
 
 URLS = {
-    'top_dramas':     MDL_BASE + '/shows/top?lang=pt-BR',
+    'top_dramas': MDL_BASE + '/shows/top?lang=pt-BR',
     'popular_dramas': MDL_BASE + '/shows/popular?lang=pt-BR',
-    'top_movies':     MDL_BASE + '/movies/top?lang=pt-BR',
+    'top_movies': MDL_BASE + '/movies/top?lang=pt-BR',
     'popular_movies': MDL_BASE + '/movies/popular?lang=pt-BR',
-    'search_dramas':  MDL_BASE + '/search?q={query}&adv=titles&ty=68&lang=pt-BR',
-    'search_movies':  MDL_BASE + '/search?q={query}&adv=titles&ty=77&lang=pt-BR',
+    'search_dramas': MDL_BASE + '/search?q={query}&adv=titles&ty=68&lang=pt-BR',
+    'search_movies': MDL_BASE + '/search?q={query}&adv=titles&ty=77&lang=pt-BR',
 }
 
 HEADERS = {
@@ -31,6 +36,7 @@ _scraper = create_scraper(
     delay=5,
 )
 
+
 def _get(url, timeout=30):
     try:
         r = _scraper.get(url, headers=HEADERS, timeout=timeout)
@@ -38,17 +44,21 @@ def _get(url, timeout=30):
     except Exception:
         return None
 
+
 def _soup(html):
     return BeautifulSoup(html, 'html.parser')
+
 
 def _img(url, size='f'):
     if not url:
         return ''
     return re.sub(r'[a-z](\.[a-zA-Z]{3,4}(\?.*)?$)', size + r'\1', url)
 
+
 def _year_from_info(info_text):
     m = re.search(r'\b(19|20)\d{2}\b', info_text or '')
     return m.group(0) if m else ''
+
 
 def _parse_list_page(html_text):
     if not html_text:
@@ -91,6 +101,7 @@ def _parse_list_page(html_text):
             continue
 
     return items
+
 
 def _parse_search_page(html_text):
     if not html_text:
@@ -139,32 +150,39 @@ def _parse_search_page(html_text):
 
     return items if items else _parse_list_page(html_text)
 
+
 def top_dramas(page=1):
     url = URLS['top_dramas'] + ('&page={}'.format(page) if page > 1 else '')
     return _parse_list_page(_get(url) or '')
+
 
 def popular_dramas(page=1):
     url = URLS['popular_dramas'] + ('&page={}'.format(page) if page > 1 else '')
     return _parse_list_page(_get(url) or '')
 
+
 def search_dramas(query):
     url = URLS['search_dramas'].format(query=quote_plus(query))
     return _parse_search_page(_get(url) or '')
+
 
 def top_movies(page=1):
     url = URLS['top_movies'] + ('&page={}'.format(page) if page > 1 else '')
     return _parse_list_page(_get(url) or '')
 
+
 def popular_movies(page=1):
     url = URLS['popular_movies'] + ('&page={}'.format(page) if page > 1 else '')
     return _parse_list_page(_get(url) or '')
+
 
 def search_movies(query):
     url = URLS['search_movies'].format(query=quote_plus(query))
     return _parse_search_page(_get(url) or '')
 
-def get_episodes(mdl_series_url):
-    eps_url = mdl_series_url.rstrip('/') + '/episodes?lang=pt-BR'
+
+def get_episodes(mdl_id):
+    eps_url = mdl_id.rstrip('/') + '/episodes?lang=pt-BR'
     html    = _get(eps_url)
     if not html:
         return []
@@ -210,4 +228,9 @@ def get_episodes(mdl_series_url):
         except Exception:
             continue
 
+    if _db and mdl_id:
+        try:
+            _db.save_episodes(mdl_id, episodes)
+        except Exception:
+            pass
     return episodes

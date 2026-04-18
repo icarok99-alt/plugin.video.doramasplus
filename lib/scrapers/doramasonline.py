@@ -4,6 +4,15 @@ from urllib.parse import urlparse, parse_qs, unquote
 from bs4 import BeautifulSoup
 import cloudscraper
 
+try:
+    from lib.resolver import Resolver
+except ImportError:
+    from resolver import Resolver
+
+_resolver = Resolver()
+
+WEBSITE = 'DORAMAS ONLINE'
+
 BASE_URL = 'https://doramasonline.org/'
 
 HEADERS = {
@@ -17,15 +26,18 @@ _scraper = cloudscraper.create_scraper(
     delay=5,
 )
 
+
 def _get(url, timeout=20):
     try:
         r = _scraper.get(url, headers=HEADERS, timeout=timeout)
         return r.text if r.status_code == 200 else None
-    except Exception:
+    except Exception as e:
         return None
+
 
 def _soup(html):
     return BeautifulSoup(html, 'html.parser')
+
 
 def _clean_url(url):
     if not url:
@@ -33,14 +45,10 @@ def _clean_url(url):
     try:
         cleaned = unquote(url.strip())
         if 'doramasonline.org/aviso' in cleaned:
-            # Sempre parsear o URL *original* (ainda codificado) para evitar que
-            # urlparse confunda '%23' decodificado → '#' com fragmento da URL externa.
             parsed = urlparse(url.strip())
             qs = parse_qs(parsed.query)
             if 'url' in qs:
                 inner = unquote(qs['url'][0])
-                # Fallback: se o URL já chegou decodificado, urlparse move o token
-                # do vídeo (#hidze) para parsed.fragment. Recuperamos aqui.
                 if parsed.fragment:
                     frag_token = parsed.fragment.split('&')[0]
                     inner = inner.rstrip('/') + '/#' + frag_token
@@ -60,6 +68,7 @@ def _clean_url(url):
         return cleaned.rstrip('&?').strip()
     except Exception:
         return url.strip()
+
 
 def _decode_holuagency(url):
     if not url:
@@ -95,6 +104,7 @@ def _decode_holuagency(url):
         return _clean_url(cleaned)
     except Exception:
         return url.strip()
+
 
 def _get_players(page_url):
     players = []
@@ -146,6 +156,7 @@ def _get_players(page_url):
         pass
     return players
 
+
 def _search_content(title, is_movie=False):
     if not title:
         return None
@@ -194,11 +205,13 @@ def _search_content(title, is_movie=False):
 
 MDL_BASE = 'https://mydramalist.com/'
 
+
 def _get_english_title(mdl_id):
     if not mdl_id:
         return ''
     try:
-        url = f'{MDL_BASE}{mdl_id.lstrip("/")}?lang=en-US'
+        base = mdl_id if mdl_id.startswith('http') else MDL_BASE + mdl_id.lstrip('/')
+        url = base.rstrip('/') + '?lang=en-US'
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
             'Accept-Language': 'en-US,en;q=0.9',
@@ -209,13 +222,16 @@ def _get_english_title(mdl_id):
         soup = BeautifulSoup(r.text, 'html.parser')
         h1 = soup.select_one('h1.film-title, h1[itemprop="name"]')
         if h1:
-            return h1.get_text(strip=True)
+            title = h1.get_text(strip=True)
+            return title
         t = soup.find('title')
         if t:
-            return t.get_text(strip=True).split('|')[0].strip()
-    except Exception:
+            title = t.get_text(strip=True).split('|')[0].strip()
+            return title
+    except Exception as e:
         pass
     return ''
+
 
 def _clean_title(title):
     if not title:
@@ -231,11 +247,12 @@ def _clean_title(title):
         r')',
         title, maxsplit=1, flags=re.IGNORECASE,
     )[0].strip()
+    cleaned = re.sub(r'\s*\((19|20)\d{2}\)\s*$', '', cleaned).strip()
     return cleaned or title
 
 
-class VOD:
-    def tvshow(self, title=None, mdl_id='', season=1, episode=1):
+class Source:
+    def tvshow(self, title, mdl_id, episode):
         if not title:
             return []
         english = _clean_title(_get_english_title(mdl_id))
@@ -247,18 +264,8 @@ class VOD:
         if not html:
             return []
         soup = _soup(html)
-        target = None
-        season_block = None
-        for se_c in soup.select('div.se-c'):
-            se_t = se_c.select_one('span.se-t')
-            if se_t and se_t.get_text(strip=True) == str(season):
-                season_block = se_c
-                break
-        episodios = (
-            season_block.select('ul.episodios li')
-            if season_block
-            else soup.select('ul.episodios li, div.episodios li')
-        )
+        target = ''
+        episodios = soup.select('ul.episodios li, div.episodios li')
         for li in episodios:
             num_div = li.select_one('.numerando')
             if not num_div:
@@ -266,24 +273,35 @@ class VOD:
             txt = num_div.get_text(strip=True)
             m = re.match(r'(\d+)\s*[-–]\s*(\d+)', txt)
             if m:
-                if int(m.group(1)) == season and int(m.group(2)) == episode:
+                if int(m.group(2)) == episode:
                     a = li.select_one('a')
                     if a:
-                        target = a.get('href')
+                        target = a.get('href', '')
                         break
             elif re.fullmatch(rf'\s*0*{episode}\s*', txt):
                 a = li.select_one('a')
                 if a:
-                    target = a.get('href')
+                    target = a.get('href', '')
                     break
         if not target:
             try:
                 target = episodios[episode - 1].select_one('a')['href']
             except Exception:
                 return []
-        return _get_players(target)
+        players = _get_players(target)
+        return players
 
-    def movie(self, title=None, mdl_id=''):
+    def resolve_tvshows(self, url):
+        try:
+            stream, sub = _resolver.resolverurls(url, url)
+            return stream, sub
+        except Exception:
+            return None, None
+
+    def resolve_movies(self, url):
+        return self.resolve_tvshows(url)
+
+    def movie(self, title, mdl_id):
         if not title:
             return []
         english = _clean_title(_get_english_title(mdl_id))
