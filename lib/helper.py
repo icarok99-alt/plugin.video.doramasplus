@@ -52,7 +52,8 @@ try:
 except:
     pass
 
-def yesno(heading="",message="",nolabel="Não",yeslabel="Sim"):
+
+def yesno(heading="", message="", nolabel="Não", yeslabel="Sim"):
     if not heading:
         heading = addonName
     if six.PY2:
@@ -61,17 +62,22 @@ def yesno(heading="",message="",nolabel="Não",yeslabel="Sim"):
         q = dialog_.yesno(heading=heading, message=message, nolabel=nolabel, yeslabel=yeslabel)
     return q
 
+
 def opensettings():
     addon.openSettings()
+
 
 def getsetting(text):
     return addon.getSetting(text)
 
-def setsetting(key,value):
+
+def setsetting(key, value):
     return addon.setSetting(key, value)
+
 
 def exists(path):
     return xbmcvfs.exists(path)
+
 
 def mkdir(path):
     try:
@@ -79,17 +85,21 @@ def mkdir(path):
     except:
         pass
 
+
 def dialog(msg):
     dialog = xbmcgui.Dialog()
     dialog.ok(addonName, msg)
+
 
 def dialog2(title, msg):
     dialog = xbmcgui.Dialog()
     dialog.ok(title, msg)
 
-def select(name,items):
+
+def select(name, items):
     op = dialog_.select(name, items)
     return op
+
 
 def log(txt):
     try:
@@ -98,16 +108,19 @@ def log(txt):
     except:
         pass
 
+
 def string_utf8(string):
     if isinstance(string, bytes):
         return string
     return string.encode("utf-8", errors="ignore")
+
 
 def to_unicode(text, encoding='utf-8', errors='strict'):
     """Force text to unicode"""
     if isinstance(text, bytes):
         return text.decode(encoding, errors=errors)
     return text
+
 
 def get_search_string(heading='', message=''):
     """Ask the user for a search string"""
@@ -118,11 +131,13 @@ def get_search_string(heading='', message=''):
         search_string = to_unicode(keyboard.getText())
     return search_string
 
+
 def input_text(heading='Put text'):
     vq = get_search_string(heading=heading, message="")
     if not vq:
         return False
     return vq
+
 
 def infoDialog(message, iconimage='', time=3000, sound=False):
     heading = addonName
@@ -136,11 +151,13 @@ def infoDialog(message, iconimage='', time=3000, sound=False):
         iconimage = xbmcgui.NOTIFICATION_ERROR
     dialog_.notification(heading, message, iconimage, time, sound=sound)
 
+
 def notify(msg):
     try:
-        infoDialog(msg,iconimage='INFO')
+        infoDialog(msg, iconimage='INFO')
     except:
         pass
+
 
 def addMenuItem(params={}, destiny='', context=[], folder=True):
     name = params.get('name', '')
@@ -160,30 +177,34 @@ def addMenuItem(params={}, destiny='', context=[], folder=True):
             destiny = destiny.split('/')[1]
         except:
             pass
-        u = 'plugin://%s/%s/%s'%(plugin.split("/")[2],destiny,quote_plus(urlencode(params)))
+        u = 'plugin://%s/%s/%s'%(plugin.split("/")[2], destiny, quote_plus(urlencode(params)))
     iconimage = params.get("iconimage", "")
     fanart = params.get("fanart", "")
     playable = params.get("playable", "")
     duration = params.get("duration", "")
-    imdbnumber = params.get("imdbnumber", "")
+    mdl_id = params.get("mdl_id", "")
     aired = params.get("aired", "")
     genre = params.get("genre", "")
-    season = params.get("season", "")
-    episode = params.get("episode", "")
+    
+    ep_num = params.get("episode_num", "") or params.get("episode", "")
     year = params.get("year", "")
     mediatype = params.get("mediatype", "video")
+    playcount = params.get("playcount", None)
     
-    li=xbmcgui.ListItem(name)
-    iconimage = iconimage if iconimage else addonIcon
+    li = xbmcgui.ListItem(name)
     li.setArt({"icon": "DefaultVideo.png", "thumb": iconimage})
     
     if kversion > 19:
         info = li.getVideoInfoTag()
         info.setTitle(name)
         info.setPlot(description)
+        if playcount is not None:
+            info.setPlaycount(int(playcount))
         infotag = True
     else:
         li.setInfo(type="Video", infoLabels={"Title": name, "Plot": description})
+        if playcount is not None:
+            li.setInfo("video", {"playcount": int(playcount)})
         infotag = False
     
     if year:
@@ -196,11 +217,11 @@ def addMenuItem(params={}, destiny='', context=[], folder=True):
             info.setDuration(int(duration))
         else:
             li.setInfo('video', {'duration': int(duration)})
-    if imdbnumber:
+    if mdl_id:
         if infotag:
-            info.setIMDBNumber(str(imdbnumber))
+            info.setUniqueID(str(mdl_id), 'mdl')
         else:
-            li.setInfo('video', {'imdbnumber': str(imdbnumber)})
+            li.setInfo('video', {'imdbnumber': str(mdl_id)})
     if aired:
         if infotag:
             info.setFirstAired(str(aired))
@@ -211,16 +232,11 @@ def addMenuItem(params={}, destiny='', context=[], folder=True):
             info.setGenres([str(genre)])
         else:
             li.setInfo('video', {'genre': str(genre)})
-    if season:
+    if ep_num:
         if infotag:
-            info.setSeason(int(season))
+            info.setEpisode(int(ep_num))
         else:
-            li.setInfo('video', {'season': int(season)})
-    if episode:
-        if infotag:
-            info.setEpisode(int(episode))
-        else:
-            li.setInfo('video', {'episode': int(episode)})
+            li.setInfo('video', {'episode': int(ep_num)})
     if mediatype:
         if infotag:
             info.setMediaType(str(mediatype))
@@ -235,6 +251,7 @@ def addMenuItem(params={}, destiny='', context=[], folder=True):
     if context:
         li.addContextMenuItems(context)
     xbmcplugin.addDirectoryItem(handle=handle, url=u, listitem=li, isFolder=folder)
+
 
 def play_video(params):
     name = params.get('name', '')
@@ -253,7 +270,7 @@ def play_video(params):
     year = params.get("year", "")
     mediatype = params.get("mediatype", "video")
     
-    li=xbmcgui.ListItem(name)
+    li = xbmcgui.ListItem(name)
     iconimage = iconimage if iconimage else ''
     li.setArt({"icon": "DefaultVideo.png", "thumb": iconimage})
     
@@ -319,11 +336,14 @@ def play_video(params):
     else:
         xbmc.Player().play(item=url, listitem=li)
 
+
 def setcontent(name):
     xbmcplugin.setContent(handle, name)
 
+
 def end(cache=True):
-    xbmcplugin.endOfDirectory(handle,cacheToDisc=cache)
+    xbmcplugin.endOfDirectory(handle, cacheToDisc=cache)
+
 
 def setview(name):
     mode = {'Wall': '500',
@@ -336,6 +356,7 @@ def setview(name):
             }.get(name, '50')
     view = 'Container.SetViewMode(%s)'%mode
     xbmc.executebuiltin(view)
+
 
 def extract_params():
     try:
@@ -359,6 +380,7 @@ def extract_params():
     except Exception as e:
         log('Failed to extract parameters: {0}'.format(str(e)))
         return '', {}
+
 
 def route(route_path):
     def decorator(func):
