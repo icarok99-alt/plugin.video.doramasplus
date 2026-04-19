@@ -3,6 +3,7 @@ from lib.helper import *
 import xbmc
 from lib import mydramalist, sources, db
 from lib.player import get_player
+from lib.proxy import get_proxy
 from lib.loading_manager import loading_manager
 from lib.db_manager import DoramasDatabaseManager
 
@@ -237,33 +238,14 @@ def play_dorama(param):
         notify('STREAM INDISPONÍVEL')
         return
 
-    # Parsear URL e headers do stream (formato: url|Header=valor&Header2=valor2)
-    if '|' in stream:
-        url, raw_headers = stream.split('|', 1)
-    else:
-        url, raw_headers = stream, ''
+    proxy = get_proxy()
+    if proxy:
+        stream = proxy.get_proxy_url(stream)
 
-    play_item = xbmcgui.ListItem(label=episode_title or serie_title, path=url)
+    play_item = xbmcgui.ListItem(label=episode_title or serie_title, path=stream)
     play_item.setArt({'thumb': iconimage, 'icon': iconimage, 'fanart': fanart or iconimage})
     play_item.setContentLookup(False)
-
-    # Detectar tipo de manifest e configurar inputstream.adaptive
-    url_lower = url.lower().split('?')[0]
-    if '.m3u8' in url_lower:
-        play_item.setMimeType('application/vnd.apple.mpegurl')
-        play_item.setProperty('inputstream', 'inputstream.adaptive')
-        play_item.setProperty('inputstream.adaptive.manifest_type', 'hls')
-    elif '.mpd' in url_lower:
-        play_item.setMimeType('application/dash+xml')
-        play_item.setProperty('inputstream', 'inputstream.adaptive')
-        play_item.setProperty('inputstream.adaptive.manifest_type', 'mpd')
-    else:
-        play_item.setMimeType('video/mp4')
-
-    # Repassar headers ao inputstream.adaptive (stream + manifest)
-    if raw_headers:
-        play_item.setProperty('inputstream.adaptive.stream_headers', raw_headers)
-        play_item.setProperty('inputstream.adaptive.manifest_headers', raw_headers)
+    play_item.setMimeType('video/mp4')
 
     kodi_version = int(xbmc.getInfoLabel('System.BuildVersion').split('.')[0])
     if kodi_version >= 20:
@@ -366,33 +348,14 @@ def play_filme(param):
         notify('STREAM INDISPONÍVEL')
         return
 
-    # Parsear URL e headers do stream (formato: url|Header=valor&Header2=valor2)
-    if '|' in stream:
-        url, raw_headers = stream.split('|', 1)
-    else:
-        url, raw_headers = stream, ''
+    proxy = get_proxy()
+    if proxy:
+        stream = proxy.get_proxy_url(stream)
 
-    play_item = xbmcgui.ListItem(label=title, path=url)
+    play_item = xbmcgui.ListItem(label=title, path=stream)
     play_item.setArt({'thumb': iconimage, 'icon': iconimage, 'fanart': fanart or iconimage})
     play_item.setContentLookup(False)
-
-    # Detectar tipo de manifest e configurar inputstream.adaptive
-    url_lower = url.lower().split('?')[0]
-    if '.m3u8' in url_lower:
-        play_item.setMimeType('application/vnd.apple.mpegurl')
-        play_item.setProperty('inputstream', 'inputstream.adaptive')
-        play_item.setProperty('inputstream.adaptive.manifest_type', 'hls')
-    elif '.mpd' in url_lower:
-        play_item.setMimeType('application/dash+xml')
-        play_item.setProperty('inputstream', 'inputstream.adaptive')
-        play_item.setProperty('inputstream.adaptive.manifest_type', 'mpd')
-    else:
-        play_item.setMimeType('video/mp4')
-
-    # Repassar headers ao inputstream.adaptive (stream + manifest)
-    if raw_headers:
-        play_item.setProperty('inputstream.adaptive.stream_headers', raw_headers)
-        play_item.setProperty('inputstream.adaptive.manifest_headers', raw_headers)
+    play_item.setMimeType('video/mp4')
 
     kodi_version = int(xbmc.getInfoLabel('System.BuildVersion').split('.')[0])
     if kodi_version >= 20:
