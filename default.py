@@ -245,7 +245,13 @@ def play_dorama(param):
     play_item = xbmcgui.ListItem(label=episode_title or serie_title, path=stream)
     play_item.setArt({'thumb': iconimage, 'icon': iconimage, 'fanart': fanart or iconimage})
     play_item.setContentLookup(False)
-    play_item.setMimeType('video/mp4')
+    stream_lower = stream.lower()
+    if '.mpd' in stream_lower:
+        play_item.setMimeType('application/dash+xml')
+    elif '.m3u8' in stream_lower or 'hls' in stream_lower:
+        play_item.setMimeType('application/x-mpegURL')
+    elif stream_lower.endswith(('.mp4', '.mkv', '.avi', '.mov', '.webm', '.ts')):
+        play_item.setMimeType('video/mp4')
 
     kodi_version = int(xbmc.getInfoLabel('System.BuildVersion').split('.')[0])
     if kodi_version >= 20:
@@ -355,7 +361,13 @@ def play_filme(param):
     play_item = xbmcgui.ListItem(label=title, path=stream)
     play_item.setArt({'thumb': iconimage, 'icon': iconimage, 'fanart': fanart or iconimage})
     play_item.setContentLookup(False)
-    play_item.setMimeType('video/mp4')
+    stream_lower = stream.lower()
+    if '.mpd' in stream_lower:
+        play_item.setMimeType('application/dash+xml')
+    elif '.m3u8' in stream_lower or 'hls' in stream_lower:
+        play_item.setMimeType('application/x-mpegURL')
+    elif stream_lower.endswith(('.mp4', '.mkv', '.avi', '.mov', '.webm', '.ts')):
+        play_item.setMimeType('video/mp4')
 
     kodi_version = int(xbmc.getInfoLabel('System.BuildVersion').split('.')[0])
     if kodi_version >= 20:
