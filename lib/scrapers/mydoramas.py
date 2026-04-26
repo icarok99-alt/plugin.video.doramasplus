@@ -243,16 +243,17 @@ def _get_players(episode_url, title=""):
     except Exception:
         stream = fallback_stream
 
-    players.append((audio, stream))
+    label = f'{WEBSITE} - {audio}' if audio == 'LEGENDADO' else audio
+    players.append((label, stream))
     return players
 
 
 def detect_audio_type(title):
     if not title:
-        return 'dublado'
-    if re.search(r'\blegendado\b', title, re.IGNORECASE):
-        return 'legendado'
-    return 'dublado'
+        return 'DUBLADO'
+    if re.search(r'\bLEGENDADO\b', title, re.IGNORECASE):
+        return 'LEGENDADO'
+    return 'DUBLADO'
 
 
 
