@@ -27,24 +27,23 @@ def _is_enabled(script_name):
 def import_scripts(pasta):
     if not os.path.isdir(pasta):
         return []
+    import importlib.util
     modulos = []
-    if pasta not in sys.path:
-        sys.path.insert(0, pasta)
     scripts = sorted(
-        f[:-3] for f in os.listdir(pasta)
+        f for f in os.listdir(pasta)
         if f.endswith('.py') and f != '__init__.py'
     )
-    for script in scripts:
-        if not _is_enabled(script):
+    for filename in scripts:
+        name = filename[:-3]
+        if not _is_enabled(name):
             continue
+        filepath = os.path.join(pasta, filename)
         try:
-            if sys.version_info.major == 3:
-                import importlib
-                modulo = (importlib.reload(sys.modules[script])
-                          if script in sys.modules
-                          else importlib.import_module(script))
-            else:
-                modulo = __import__(script)
+            spec = importlib.util.spec_from_file_location(
+                'scrapers.' + name, filepath
+            )
+            modulo = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(modulo)
             if hasattr(modulo, 'Source'):
                 modulos.append(modulo)
         except Exception:
@@ -52,14 +51,7 @@ def import_scripts(pasta):
     return modulos
 
 
-_modules_import = None
-
-
-def _get_modules():
-    global _modules_import
-    if _modules_import is None:
-        _modules_import = import_scripts(scrapers_path)
-    return _modules_import
+modules_import = import_scripts(scrapers_path)
 
 
 def _label(modulo):
@@ -68,7 +60,7 @@ def _label(modulo):
 
 def show_content(title, mdl_id, episode):
     results = []
-    for modulo in _get_modules():
+    for modulo in modules_import:
         site = _label(modulo)
         try:
             links = modulo.Source().tvshow(
@@ -85,7 +77,7 @@ def show_content(title, mdl_id, episode):
 
 def movie_content(title, mdl_id):
     results = []
-    for modulo in _get_modules():
+    for modulo in modules_import:
         site = _label(modulo)
         try:
             links = modulo.Source().movie(title=title, mdl_id=mdl_id)
@@ -99,7 +91,7 @@ def movie_content(title, mdl_id):
 def resolve_tvshows(url):
     stream = ''
     sub = ''
-    for modulo in _get_modules():
+    for modulo in modules_import:
         if stream:
             break
         try:
@@ -115,7 +107,7 @@ def resolve_tvshows(url):
 def resolve_movies(url):
     stream = ''
     sub = ''
-    for modulo in _get_modules():
+    for modulo in modules_import:
         if stream:
             break
         try:
