@@ -32,7 +32,7 @@ class UpNextDialog(xbmcgui.WindowXMLDialog):
             ep_title = self.next_info.get('ep_title', '')
             thumb    = self.next_info.get('ep_img', '')
 
-            label = 'Episode {} {}'.format(ep_num, ep_title).strip() if ep_title else 'Episode {}'.format(ep_num)
+            label = ep_title or ''
             self.getControl(self.LBL_NEXT).setLabel(label)
             if thumb:
                 self.getControl(self.IMG_THUMB).setImage(thumb)
