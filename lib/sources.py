@@ -52,7 +52,14 @@ def import_scripts(pasta):
     return modulos
 
 
-modules_import = import_scripts(scrapers_path)
+_modules_import = None
+
+
+def _get_modules():
+    global _modules_import
+    if _modules_import is None:
+        _modules_import = import_scripts(scrapers_path)
+    return _modules_import
 
 
 def _label(modulo):
@@ -61,7 +68,7 @@ def _label(modulo):
 
 def show_content(title, mdl_id, episode):
     results = []
-    for modulo in modules_import:
+    for modulo in _get_modules():
         site = _label(modulo)
         try:
             links = modulo.Source().tvshow(
@@ -78,7 +85,7 @@ def show_content(title, mdl_id, episode):
 
 def movie_content(title, mdl_id):
     results = []
-    for modulo in modules_import:
+    for modulo in _get_modules():
         site = _label(modulo)
         try:
             links = modulo.Source().movie(title=title, mdl_id=mdl_id)
@@ -92,7 +99,7 @@ def movie_content(title, mdl_id):
 def resolve_tvshows(url):
     stream = ''
     sub = ''
-    for modulo in modules_import:
+    for modulo in _get_modules():
         if stream:
             break
         try:
@@ -108,7 +115,7 @@ def resolve_tvshows(url):
 def resolve_movies(url):
     stream = ''
     sub = ''
-    for modulo in modules_import:
+    for modulo in _get_modules():
         if stream:
             break
         try:
