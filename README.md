@@ -63,7 +63,7 @@ Instale **todas as dependências abaixo antes** do add-on:
 
 Após instalar todas as dependências, instale o add-on:
 
-* [**plugin.video.doramasplus**](https://github.com/oneplayhd/oneplayhd.github.io/raw/refs/heads/master/plugin.video.doramasplus/plugin.video.doramasplus-1.1.8)
+* [**plugin.video.doramasplus**](https://github.com/oneplayhd/oneplayhd.github.io/raw/refs/heads/master/plugin.video.doramasplus/plugin.video.doramasplus-1.1.8.zip)
 
 A instalação é feita pelo caminho:
 
