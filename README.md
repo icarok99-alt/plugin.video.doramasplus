@@ -1,4 +1,4 @@
-# 🌸 Add-on Doramasplus para Kodi
+# 🌸 Add-on Doramas Plus para Kodi
 
 ## 📌 Descrição
 
@@ -58,13 +58,8 @@ Caso prefira instalar manualmente, será necessário instalar as dependências a
 
 Instale **todas as dependências abaixo antes** do add-on:
 
-* **script.module.simplejson**
-* **script.module.six**
-* **script.module.kodi-six**
-* **script.module.requests**
-* **script.module.beautifulsoup4**
-* [**script.module.resolveurl.fork**](https://github.com/oneplayhd/oneplayhd.github.io/raw/refs/heads/master/script.module.resolveurl.fork/script.module.resolveurl.fork-5.1.192.zip)
-* **script.module.cloudrequest**
+* [**script.module.resolveurl.fork**](https://github.com/oneplayhd/oneplayhd.github.io/raw/refs/heads/master/script.module.resolveurl.fork/script.module.resolveurl.fork-5.1.195.zip)
+* [**script.module.cloudrequest**](https://github.com/oneplayhd/oneplayhd.github.io/raw/refs/heads/master/script.module.cloudrequest/script.module.cloudrequest-1.0.2.zip)
 
 Após instalar todas as dependências, instale o add-on:
 
