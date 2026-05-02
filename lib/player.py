@@ -18,7 +18,7 @@ class DoramaPlayer(xbmc.Player):
         self.upnext = get_upnext_service(self)
         self._monitor_thread = None
 
-    def start_monitoring(self, mdl_id, ep_num, serie_title, next_info=None):
+    def start_monitoring(self, mdl_id, ep_num, serie_title, next_info=None, resume_time=None):
         with self._lock:
             self._on = False
 
@@ -39,10 +39,10 @@ class DoramaPlayer(xbmc.Player):
             with self._lock: self._on = False; return
         if next_info:
             self.upnext.start_monitoring(mdl_id, ep_num, serie_title, next_info)
-        self._monitor_thread = threading.Thread(target=self._loop, daemon=True)
+        self._monitor_thread = threading.Thread(target=self._loop, args=(resume_time,), daemon=True)
         self._monitor_thread.start()
 
-    def _loop(self):
+    def _loop(self, resume_time=None):
         mon = xbmc.Monitor(); total = 0
         for _ in range(60):
             with self._lock:
@@ -54,7 +54,12 @@ class DoramaPlayer(xbmc.Player):
             mon.waitForAbort(0.5)
         if total <= 60:
             with self._lock: self._on = False; return
-        with self._lock: self._total = total
+        with self._lock:
+            self._total = total
+            mdl_id = self._id; ep = self._ep
+        if resume_time and 0 < resume_time < total * 0.95:
+            try: self.seekTime(resume_time)
+            except Exception: pass
         at = total * 0.9
         while self.isPlayingVideo():
             with self._lock:
@@ -66,13 +71,22 @@ class DoramaPlayer(xbmc.Player):
                 self._last = ct
                 if not self._watched and ct >= at:
                     self._watched = True
-                    mdl_id, ep = self._id, self._ep
+                    do_mark = True
                 else:
-                    mdl_id, ep = None, None
-            if mdl_id and ep is not None:
+                    do_mark = False
+            if do_mark:
                 threading.Thread(target=db.mark_watched, args=(mdl_id, ep), daemon=True).start()
+                threading.Thread(target=db.clear_resume_time, args=(mdl_id, ep), daemon=True).start()
             mon.waitForAbort(0.5)
-        with self._lock: self._on = False
+        with self._lock:
+            watched = self._watched
+            last = self._last
+            self._on = False
+        if not watched and total > 60:
+            if last > total * 0.02 and last < total * 0.85:
+                db.save_resume_time(mdl_id, ep, last, total)
+            elif last >= total * 0.85:
+                db.clear_resume_time(mdl_id, ep)
 
     def _on_stop(self, ended=False):
         with self._lock:

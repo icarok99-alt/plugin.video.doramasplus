@@ -190,6 +190,7 @@ def addMenuItem(params={}, destiny='', context=[], folder=True):
     year = params.get("year", "")
     mediatype = params.get("mediatype", "video")
     playcount = params.get("playcount", None)
+    resume_time = params.get("resume_time", None)
     
     li = xbmcgui.ListItem(name)
     li.setArt({"icon": "DefaultVideo.png", "thumb": iconimage})
@@ -244,6 +245,10 @@ def addMenuItem(params={}, destiny='', context=[], folder=True):
             li.setInfo('video', {'mediatype': str(mediatype)})
     if playable and folder == False and not playable == 'false':
         li.setProperty('IsPlayable', 'true')
+    if resume_time is not None:
+        position, total = resume_time
+        li.setProperty('ResumeTime', str(int(position)))
+        li.setProperty('TotalTime', str(int(total)))
     if fanart:
         li.setProperty('fanart_image', fanart)
     else:
