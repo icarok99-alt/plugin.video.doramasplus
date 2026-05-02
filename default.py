@@ -182,6 +182,7 @@ def open_episodes_mdl(param):
         notify('Nenhum episódio encontrado')
         return
     watched_set = db.get_watched(mdl_id)
+    resume_map = db.get_all_resume_times(mdl_id)
     setcontent('episodes')
     for ep_num, ep_title, ep_img, ep_desc, air_date, ep_score in episodes:
         label = f'[COLOR gold]★ {ep_score}[/COLOR]  {ep_title}' if ep_score else ep_title
@@ -189,7 +190,8 @@ def open_episodes_mdl(param):
         addMenuItem({'name': label, 'description': desc, 'iconimage': ep_img or serie_img,
                      'serie_title': serie_title, 'episode_num': str(ep_num),
                      'episode_title': ep_title, 'year': year, 'mdl_id': mdl_id,
-                     'playable': True, 'playcount': 1 if ep_num in watched_set else 0},
+                     'playable': True, 'playcount': 1 if ep_num in watched_set else 0,
+                     'resume_time': resume_map.get(ep_num)},
                     destiny='/play_dorama', folder=False)
     end()
 
@@ -310,7 +312,9 @@ def play_dorama(param):
 
         next_ep = db.get_next_episode(mdl_id, episode_num)
         next_info = {'ep_num': next_ep['ep_num'], 'ep_title': next_ep.get('ep_title', ''), 'ep_img': next_ep.get('ep_img', '')} if next_ep else None
-        get_player().start_monitoring(mdl_id, episode_num, serie_title, next_info)
+        resume_data = db.get_resume_time(mdl_id, episode_num)
+        resume_time = resume_data[0] if resume_data else None
+        get_player().start_monitoring(mdl_id, episode_num, serie_title, next_info, resume_time=resume_time)
 
 
 @route('/play_filme')

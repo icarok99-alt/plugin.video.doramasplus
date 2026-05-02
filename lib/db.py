@@ -30,6 +30,10 @@ def _init_db():
             watched_at TEXT, PRIMARY KEY (mdl_id, ep_num))''')
         cur.execute('CREATE INDEX IF NOT EXISTS idx_eps ON episodes(mdl_id)')
         cur.execute('CREATE INDEX IF NOT EXISTS idx_w   ON watched(mdl_id)')
+        cur.execute('''CREATE TABLE IF NOT EXISTS resume_time (
+            mdl_id TEXT NOT NULL, ep_num INTEGER NOT NULL,
+            position REAL NOT NULL, total_time REAL NOT NULL DEFAULT 0.0,
+            updated_at TEXT, PRIMARY KEY (mdl_id, ep_num))''')
         con.commit()
     finally:
         con.close()
@@ -101,3 +105,31 @@ def is_watched(mdl_id, ep_num):
         cur = con.cursor()
         cur.execute('SELECT 1 FROM watched WHERE mdl_id=? AND ep_num=?', (mdl_id, int(ep_num)))
         return cur.fetchone() is not None
+
+
+def save_resume_time(mdl_id, ep_num, position, total_time=0.0):
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    with _conn() as con:
+        con.cursor().execute(
+            'INSERT OR REPLACE INTO resume_time(mdl_id,ep_num,position,total_time,updated_at) VALUES(?,?,?,?,?)',
+            (mdl_id, int(ep_num), float(position), float(total_time), now))
+
+
+def get_resume_time(mdl_id, ep_num):
+    with _conn() as con:
+        cur = con.cursor()
+        cur.execute('SELECT position, total_time FROM resume_time WHERE mdl_id=? AND ep_num=?', (mdl_id, int(ep_num)))
+        row = cur.fetchone()
+        return (float(row[0]), float(row[1])) if row else None
+
+
+def clear_resume_time(mdl_id, ep_num):
+    with _conn() as con:
+        con.cursor().execute('DELETE FROM resume_time WHERE mdl_id=? AND ep_num=?', (mdl_id, int(ep_num)))
+
+
+def get_all_resume_times(mdl_id):
+    with _conn() as con:
+        cur = con.cursor()
+        cur.execute('SELECT ep_num, position, total_time FROM resume_time WHERE mdl_id=?', (mdl_id,))
+        return {row[0]: (float(row[1]), float(row[2])) for row in cur.fetchall()}
