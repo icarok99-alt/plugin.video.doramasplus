@@ -238,6 +238,8 @@ def play_dorama(param):
     if not stream:
         loading_manager.force_close()
         notify('STREAM INDISPONÍVEL')
+        xbmc.PlayList(xbmc.PLAYLIST_VIDEO).clear()
+        xbmcplugin.setResolvedUrl(int(sys.argv[1]), False, xbmcgui.ListItem())
         return
 
     proxy = get_proxy()
