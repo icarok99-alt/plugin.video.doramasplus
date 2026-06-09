@@ -292,7 +292,7 @@ def play_dorama(param):
                 addon_id = plugin.split('/')[2]
                 for ep in episodes:
                     ep_num = ep.get('ep_num', 0)
-                    if ep_num < episode_num: continue
+                    if ep_num <= episode_num: continue
                     ep_title = ep.get('ep_title') or f'Episode {ep_num}'
                     ep_img = ep.get('ep_img') or iconimage
                     params = {'serie_title': serie_title, 'episode_num': str(ep_num), 'episode_title': ep_title, 
