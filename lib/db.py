@@ -58,7 +58,7 @@ def _conn():
 def save_episodes(mdl_id, episodes):
     if not episodes:
         return
-    now  = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     rows = [(mdl_id, n, t, i, d, a, s, now) for n, t, i, d, a, s in episodes]
     with _conn() as con:
         con.executemany('''INSERT INTO episodes

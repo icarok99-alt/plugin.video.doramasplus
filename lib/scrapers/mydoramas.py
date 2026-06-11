@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import re
 import requests
 from bs4 import BeautifulSoup
@@ -254,7 +255,6 @@ def detect_audio_type(title):
     if re.search(r'\bLEGENDADO\b', title, re.IGNORECASE):
         return 'LEGENDADO'
     return 'DUBLADO'
-
 
 
 def _get_english_title(mdl_id):

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import re
 import base64
 from urllib.parse import urlparse, parse_qs, unquote
