@@ -256,7 +256,6 @@ def detect_audio_type(title):
     return 'DUBLADO'
 
 
-
 def _get_english_title(mdl_id):
     if not mdl_id:
         return ''

@@ -1,5 +1,5 @@
-# -*- coding: utf-8 -*-
 from lib.helper import *
+import threading
 import xbmc
 from lib import mydramalist, sources, db
 from lib.player import get_player
@@ -19,7 +19,7 @@ try:
         def __init__(self):
             try:
                 self.image = xbmcgui.ControlImage(440, 128, 400, 400, translate(os.path.join(homeDir, 'resources', 'images', 'qrcode-pix.png')))
-                self.text  = xbmcgui.ControlLabel(x=210, y=570, width=1100, height=25, label='[B][COLOR pink]SE ESSE ADD-ON LHE AGRADA, FAÇA UMA DOAÇÃO VIA PIX ACIMA E MANTENHA ESSE SERVIÇO ATIVO[/COLOR][/B]', textColor='pink')
+                self.text = xbmcgui.ControlLabel(x=210, y=570, width=1100, height=25, label='[B][COLOR pink]SE ESSE ADD-ON LHE AGRADA, FAÇA UMA DOAÇÃO VIA PIX ACIMA E MANTENHA ESSE SERVIÇO ATIVO[/COLOR][/B]', textColor='pink')
                 self.text2 = xbmcgui.ControlLabel(x=495, y=600, width=1000, height=25, label='[B][COLOR pink]PRESSIONE VOLTAR PARA SAIR[/COLOR][/B]', textColor='pink')
                 self.addControl(self.image)
                 self.addControl(self.text)
@@ -187,11 +187,12 @@ def open_episodes_mdl(param):
     for ep_num, ep_title, ep_img, ep_desc, air_date, ep_score in episodes:
         label = f'[COLOR gold]★ {ep_score}[/COLOR]  {ep_title}' if ep_score else ep_title
         desc = '\n'.join(filter(None, [air_date, ep_desc]))
+        ep_resume = resume_map.get(ep_num)
         addMenuItem({'name': label, 'description': desc, 'iconimage': ep_img or serie_img,
                      'serie_title': serie_title, 'episode_num': str(ep_num),
                      'episode_title': ep_title, 'year': year, 'mdl_id': mdl_id,
                      'playable': True, 'playcount': 1 if ep_num in watched_set else 0,
-                     'resume_time': resume_map.get(ep_num)},
+                     'resume_time': str(ep_resume[0]) if ep_resume else ''},
                     destiny='/play_dorama', folder=False)
     end()
 
@@ -207,117 +208,162 @@ def play_dorama(param):
     year = param.get('year', '')
     mdl_id = param.get('mdl_id', '')
 
+    resume_time = None
+    if mdl_id:
+        resume_data = db.get_resume_time(mdl_id, episode_num)
+        if resume_data and resume_data[0] > 0:
+            if ask_resume(resume_data[0]):
+                resume_time = resume_data[0]
+            else:
+                db.clear_resume_time(mdl_id, episode_num)
+
     loading_manager.show()
 
-    players = sources.show_content(title=serie_title, mdl_id=mdl_id, episode=episode_num)
-    if not players:
-        loading_manager.force_close()
-        notify('Nenhum player encontrado')
-        return
-
-    if getsetting('autoplay') == 'true':
-        order = _autoplay_order(players)
-        loading_manager.set_resolving()
-    else:
-        idx = loading_manager.set_phase2([(n, '') for n, u in players])
-        if idx < 0:
+    try:
+        players = sources.show_content(title=serie_title, mdl_id=mdl_id, episode=episode_num)
+        if not players:
             loading_manager.force_close()
+            notify('Nenhum player encontrado')
             return
-        order = [idx] + [i for i in range(len(players)) if i != idx]
 
-    stream = None
-    for i in order:
-        name, player_url = players[i]
-        if not player_url: continue
-        try:
-            stream, _ = sources.resolve_tvshows(player_url)
-            if stream: break
-        except:
-            continue
+        if getsetting('autoplay') == 'true':
+            order = _autoplay_order(players)
+            loading_manager.set_resolving()
+        else:
+            idx = loading_manager.set_phase2([(n, '') for n, u in players])
+            if idx < 0:
+                loading_manager.force_close()
+                return
+            order = [idx] + [i for i in range(len(players)) if i != idx]
 
-    if not stream:
+        stream = None
+        for i in order:
+            name, player_url = players[i]
+            if not player_url:
+                continue
+            try:
+                stream, _ = sources.resolve_tvshows(player_url)
+                if stream:
+                    break
+            except Exception:
+                continue
+
+        if not stream:
+            loading_manager.force_close()
+            notify('STREAM INDISPONÍVEL')
+            xbmcplugin.setResolvedUrl(int(sys.argv[1]), False, xbmcgui.ListItem())
+            xbmc.PlayList(xbmc.PLAYLIST_VIDEO).clear()
+            return
+
+        proxy = get_proxy()
+        if proxy:
+            stream = proxy.get_proxy_url(stream)
+
+        play_item = xbmcgui.ListItem(label=episode_title or serie_title, path=stream)
+        play_item.setArt({'thumb': iconimage, 'icon': iconimage, 'fanart': fanart or iconimage})
+        play_item.setContentLookup(False)
+        stream_lower = stream.lower()
+        if '.mpd' in stream_lower:
+            play_item.setMimeType('application/dash+xml')
+        elif '.m3u8' in stream_lower or 'hls' in stream_lower:
+            play_item.setMimeType('application/x-mpegURL')
+        elif stream_lower.endswith(('.mp4', '.mkv', '.avi', '.mov', '.webm', '.ts')):
+            play_item.setMimeType('video/mp4')
+
+        kodi_version = int(xbmc.getInfoLabel('System.BuildVersion').split('.')[0])
+        if kodi_version >= 20:
+            tag = play_item.getVideoInfoTag()
+            tag.setTitle(episode_title or serie_title)
+            tag.setPlot(description)
+            tag.setMediaType('episode')
+            if year and year != '0':
+                try:
+                    tag.setYear(int(year))
+                except Exception:
+                    pass
+            tag.setTvShowTitle(serie_title)
+            tag.setOriginalTitle(serie_title)
+            tag.setSeason(1)
+            tag.setEpisode(episode_num)
+        else:
+            info = {
+                'title': episode_title or serie_title,
+                'plot': description,
+                'mediatype': 'episode',
+                'tvshowtitle': serie_title,
+                'originaltitle': serie_title,
+                'season': 1,
+                'episode': episode_num,
+            }
+            if year and year != '0':
+                try:
+                    info['year'] = int(year)
+                except Exception:
+                    pass
+            play_item.setInfo('video', info)
+
+        xbmcplugin.setResolvedUrl(int(sys.argv[1]), True, play_item)
+        loading_manager.close()
+
+        if mdl_id:
+            try:
+                episodes = db.get_episodes(mdl_id)
+                if episodes:
+                    playlist = xbmc.PlayList(xbmc.PLAYLIST_VIDEO)
+                    kv = int(xbmc.getInfoLabel('System.BuildVersion').split('.')[0])
+                    addon_id = plugin.split('/')[2]
+                    for ep in episodes:
+                        ep_num = ep.get('ep_num', 0)
+                        if ep_num <= episode_num:
+                            continue
+                        ep_title = ep.get('ep_title') or f'Episode {ep_num}'
+                        ep_img = ep.get('ep_img') or iconimage
+                        ep_params = {
+                            'serie_title':   serie_title,
+                            'episode_num':   str(ep_num),
+                            'episode_title': ep_title,
+                            'iconimage':     ep_img,
+                            'description':   ep.get('ep_desc', ''),
+                            'mdl_id':        mdl_id,
+                        }
+                        from urllib.parse import urlencode, quote_plus
+                        purl = f'plugin://{addon_id}/play_dorama/{quote_plus(urlencode(ep_params))}'
+                        li = xbmcgui.ListItem(ep_title)
+                        li.setArt({'thumb': ep_img, 'icon': ep_img})
+                        if kv >= 20:
+                            t = li.getVideoInfoTag()
+                            t.setTitle(ep_title)
+                            t.setTvShowTitle(serie_title)
+                            t.setMediaType('episode')
+                            t.setEpisode(ep_num)
+                        else:
+                            li.setInfo('video', {
+                                'title': ep_title, 'tvshowtitle': serie_title,
+                                'mediatype': 'episode', 'episode': ep_num,
+                            })
+                        playlist.add(url=purl, listitem=li)
+            except Exception:
+                pass
+
+        next_ep = db.get_next_episode(mdl_id, episode_num) if mdl_id else None
+        next_info = (
+            {'ep_num': next_ep['ep_num'],
+             'ep_title': next_ep.get('ep_title', ''),
+             'ep_img':   next_ep.get('ep_img', '')}
+            if next_ep else None
+        )
+        threading.Thread(
+            target=get_player().start_monitoring,
+            args=(mdl_id, episode_num, serie_title),
+            kwargs={'next_info': next_info, 'resume_time': resume_time},
+            daemon=True,
+        ).start()
+
+    except Exception:
         loading_manager.force_close()
         notify('STREAM INDISPONÍVEL')
-        xbmc.PlayList(xbmc.PLAYLIST_VIDEO).clear()
         xbmcplugin.setResolvedUrl(int(sys.argv[1]), False, xbmcgui.ListItem())
-        return
-
-    proxy = get_proxy()
-    if proxy:
-        stream = proxy.get_proxy_url(stream)
-
-    play_item = xbmcgui.ListItem(label=episode_title or serie_title, path=stream)
-    play_item.setArt({'thumb': iconimage, 'icon': iconimage, 'fanart': fanart or iconimage})
-    play_item.setContentLookup(False)
-    stream_lower = stream.lower()
-    if '.mpd' in stream_lower:
-        play_item.setMimeType('application/dash+xml')
-    elif '.m3u8' in stream_lower or 'hls' in stream_lower:
-        play_item.setMimeType('application/x-mpegURL')
-    elif stream_lower.endswith(('.mp4', '.mkv', '.avi', '.mov', '.webm', '.ts')):
-        play_item.setMimeType('video/mp4')
-
-    kodi_version = int(xbmc.getInfoLabel('System.BuildVersion').split('.')[0])
-    if kodi_version >= 20:
-        tag = play_item.getVideoInfoTag()
-        tag.setTitle(episode_title or serie_title)
-        tag.setPlot(description)
-        tag.setMediaType('episode')
-        if year and year != '0':
-            try: tag.setYear(int(year))
-            except: pass
-        tag.setTvShowTitle(serie_title)
-        tag.setOriginalTitle(serie_title)
-        tag.setSeason(1)
-        tag.setEpisode(episode_num)
-    else:
-        info = {'title': episode_title or serie_title, 'plot': description, 'mediatype': 'episode', 
-                'tvshowtitle': serie_title, 'originaltitle': serie_title, 'season': 1, 'episode': episode_num}
-        if year and year != '0':
-            try: info['year'] = int(year)
-            except: pass
-        play_item.setInfo('video', info)
-
-    xbmcplugin.setResolvedUrl(int(sys.argv[1]), True, play_item)
-    loading_manager.close()
-
-    # Playlist simples direta
-    if mdl_id:
-        try:
-            episodes = db.get_episodes(mdl_id)
-            if episodes:
-                playlist = xbmc.PlayList(xbmc.PLAYLIST_VIDEO)
-                playlist.clear()
-                kv = int(xbmc.getInfoLabel('System.BuildVersion').split('.')[0])
-                addon_id = plugin.split('/')[2]
-                for ep in episodes:
-                    ep_num = ep.get('ep_num', 0)
-                    if ep_num <= episode_num: continue
-                    ep_title = ep.get('ep_title') or f'Episode {ep_num}'
-                    ep_img = ep.get('ep_img') or iconimage
-                    params = {'serie_title': serie_title, 'episode_num': str(ep_num), 'episode_title': ep_title, 
-                              'iconimage': ep_img, 'description': ep.get('ep_desc', ''), 'mdl_id': mdl_id}
-                    from urllib.parse import urlencode, quote_plus
-                    purl = f'plugin://{addon_id}/play_dorama/{quote_plus(urlencode(params))}'
-                    li = xbmcgui.ListItem(ep_title)
-                    li.setArt({'thumb': ep_img, 'icon': ep_img})
-                    if kv >= 20:
-                        tag = li.getVideoInfoTag()
-                        tag.setTitle(ep_title)
-                        tag.setTvShowTitle(serie_title)
-                        tag.setMediaType('episode')
-                        tag.setEpisode(ep_num)
-                    else:
-                        li.setInfo('video', {'title': ep_title, 'tvshowtitle': serie_title, 'mediatype': 'episode', 'episode': ep_num})
-                    playlist.add(url=purl, listitem=li)
-        except:
-            pass
-
-        next_ep = db.get_next_episode(mdl_id, episode_num)
-        next_info = {'ep_num': next_ep['ep_num'], 'ep_title': next_ep.get('ep_title', ''), 'ep_img': next_ep.get('ep_img', '')} if next_ep else None
-        resume_data = db.get_resume_time(mdl_id, episode_num)
-        resume_time = resume_data[0] if resume_data else None
-        get_player().start_monitoring(mdl_id, episode_num, serie_title, next_info, resume_time=resume_time)
+        xbmc.PlayList(xbmc.PLAYLIST_VIDEO).clear()
 
 
 @route('/play_filme')
@@ -359,7 +405,6 @@ def play_filme(param):
     if not stream:
         loading_manager.force_close()
         notify('STREAM INDISPONÍVEL')
-        xbmcplugin.setResolvedUrl(int(sys.argv[1]), False, xbmcgui.ListItem())
         return
 
     proxy = get_proxy()

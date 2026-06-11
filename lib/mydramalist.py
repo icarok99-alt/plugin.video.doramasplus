@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import re
 
 try:
@@ -64,7 +63,7 @@ def _parse_list_page(html_text):
     if not html_text:
         return []
 
-    soup  = _soup(html_text)
+    soup = _soup(html_text)
     items = []
 
     for card in soup.select('div.box[id^="mdl-"]'):
@@ -74,19 +73,19 @@ def _parse_list_page(html_text):
                 continue
 
             title = a_title.get_text(strip=True)
-            href  = a_title.get('href', '')
+            href = a_title.get('href', '')
             if not href.startswith('http'):
                 href = MDL_BASE + href
 
             img_tag = card.select_one('img.cover')
-            img     = _img(img_tag.get('data-src') or img_tag.get('src') or '') if img_tag else ''
+            img = _img(img_tag.get('data-src') or img_tag.get('src') or '') if img_tag else ''
 
             info_tag = card.select_one('span.text-muted')
-            info     = info_tag.get_text(strip=True) if info_tag else ''
-            year     = _year_from_info(info)
+            info = info_tag.get_text(strip=True) if info_tag else ''
+            year = _year_from_info(info)
 
             score_tag = card.select_one('span.score')
-            score     = score_tag.get_text(strip=True) if score_tag else ''
+            score = score_tag.get_text(strip=True) if score_tag else ''
 
             description = ''
             for p in card.select('p'):
@@ -107,7 +106,7 @@ def _parse_search_page(html_text):
     if not html_text:
         return []
 
-    soup  = _soup(html_text)
+    soup = _soup(html_text)
     items = []
 
     for item in soup.select('.result-item'):
@@ -122,19 +121,19 @@ def _parse_search_page(html_text):
                 continue
 
             title = a_title.get_text(strip=True)
-            href  = a_title.get('href', '')
+            href = a_title.get('href', '')
             if not href.startswith('http'):
                 href = MDL_BASE + href
 
             img_tag = item.find('img')
-            img     = _img(img_tag.get('data-src') or img_tag.get('src') or '') if img_tag else ''
+            img = _img(img_tag.get('data-src') or img_tag.get('src') or '') if img_tag else ''
 
             info_tag = item.select_one('.text-muted')
-            info     = info_tag.get_text(strip=True) if info_tag else ''
-            year     = _year_from_info(info)
+            info = info_tag.get_text(strip=True) if info_tag else ''
+            year = _year_from_info(info)
 
             score_tag = item.select_one('.score')
-            score     = score_tag.get_text(strip=True) if score_tag else ''
+            score = score_tag.get_text(strip=True) if score_tag else ''
 
             description = ''
             for p in item.select('p'):
@@ -183,44 +182,44 @@ def search_movies(query):
 
 def get_episodes(mdl_id):
     eps_url = mdl_id.rstrip('/') + '/episodes?lang=pt-BR'
-    html    = _get(eps_url)
+    html = _get(eps_url)
     if not html:
         return []
 
-    soup     = _soup(html)
+    soup = _soup(html)
     episodes = []
-    counter  = 0
+    counter = 0
 
     for ep_div in soup.select('div.episode'):
         try:
             counter += 1
 
             cover_div = ep_div.select_one('div.cover')
-            img_tag   = cover_div.find('img') if cover_div else ep_div.find('img')
-            img       = (img_tag.get('data-src') or img_tag.get('src') or '') if img_tag else ''
+            img_tag = cover_div.find('img') if cover_div else ep_div.find('img')
+            img = (img_tag.get('data-src') or img_tag.get('src') or '') if img_tag else ''
 
-            a_tag   = ep_div.select_one('h2.title a') or ep_div.select_one('div.cover a') or ep_div.find('a')
+            a_tag = ep_div.select_one('h2.title a') or ep_div.select_one('div.cover a') or ep_div.find('a')
             ep_href = a_tag.get('href', '') if a_tag else ''
-            ep_num  = counter
+            ep_num = counter
             m = re.search(r'/episode/(\d+)', ep_href)
             if m:
                 ep_num = int(m.group(1))
 
-            raw   = a_tag.get_text(strip=True) if a_tag else ''
-            m_ep  = re.search(r'(Episode\s+\d+.*)', raw)
+            raw = a_tag.get_text(strip=True) if a_tag else ''
+            m_ep = re.search(r'(Episode\s+\d+.*)', raw)
             title = m_ep.group(1).strip() if m_ep else 'Episode {}'.format(ep_num)
 
-            desc_div    = ep_div.select_one('div.summary')
+            desc_div = ep_div.select_one('div.summary')
             description = ''
             if desc_div:
                 for a in desc_div.find_all('a'):
                     a.decompose()
                 description = desc_div.get_text(' ', strip=True).strip()
 
-            air_tag  = ep_div.select_one('.air-date')
+            air_tag = ep_div.select_one('.air-date')
             air_date = air_tag.get_text(strip=True) if air_tag else ''
 
-            score_b  = ep_div.select_one('.rating-panel b')
+            score_b = ep_div.select_one('.rating-panel b')
             ep_score = score_b.get_text(strip=True) if score_b else ''
 
             episodes.append((ep_num, title, img, description, air_date, ep_score))

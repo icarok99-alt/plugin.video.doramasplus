@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 import socket
 import threading
@@ -18,7 +17,7 @@ def kill_process_on_port(port):
             f"ss -lptn 'sport = :{port}' | grep -oP 'pid=\\K[0-9]+'",
             f"netstat -nlp | grep :{port} | awk '{{print $7}}' | cut -d'/' -f1",
         ]
-        
+
         pid = None
         for cmd in commands:
             try:
@@ -28,7 +27,7 @@ def kill_process_on_port(port):
                     break
             except Exception:
                 continue
-        
+
         if pid and pid.isdigit():
             pid = int(pid)
             if pid != os.getpid():
@@ -79,10 +78,10 @@ class StreamProxy:
             if is_port_responding(self.port, timeout=0.3):
                 self.running = True
                 return True
-            
+
             if kill_process_on_port(self.port):
                 time.sleep(0.5)
-            
+
             if is_port_in_use(self.port):
                 if is_port_responding(self.port, timeout=0.3):
                     self.running = True
@@ -95,7 +94,7 @@ class StreamProxy:
                 self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
             except (AttributeError, OSError):
                 pass
-            
+
             self.server.bind(("127.0.0.1", self.port))
             self.server.listen(5)
             self.server.settimeout(1.0)
@@ -136,7 +135,7 @@ class StreamProxy:
             lines = req.splitlines()
             if not lines:
                 return
-                
+
             line = lines[0]
             parts = line.split()
             if len(parts) < 2:
@@ -181,18 +180,18 @@ class StreamProxy:
     def _is_valid_mp4_start(self, data):
         if len(data) < 8:
             return False
-        
+
         valid_atoms = [b'ftyp', b'moov', b'mdat', b'free', b'skip', b'wide', b'pnot']
-        
+
         atom_type = data[4:8]
         if atom_type in valid_atoms:
             return True
-        
+
         for i in range(min(20, len(data) - 8)):
             atom_type = data[i+4:i+8]
             if atom_type in valid_atoms:
                 return i < 8
-        
+
         return False
 
     def _has_garbage_prefix(self, data):
@@ -202,11 +201,11 @@ class StreamProxy:
             b"\xff\xd8\xff",
             b"RIFF"
         ]
-        
+
         for sig in garbage_signatures:
             if data.startswith(sig):
                 return True
-        
+
         return False
 
     def _process_request(self, client, url, headers, range_header=None):
@@ -218,10 +217,10 @@ class StreamProxy:
                 "Referer": headers.get("Referer", ""),
                 "Origin": headers.get("Origin", ""),
             }
-            
+
             if range_header:
                 request_headers["Range"] = range_header
-            
+
             r = requests.get(
                 url,
                 headers=request_headers,
@@ -236,7 +235,7 @@ class StreamProxy:
         content_type = r.headers.get("Content-Type", "").lower()
         is_m3u8_by_content_type = "m3u8" in content_type or "mpegurl" in content_type
         is_m3u8_by_url = url.lower().endswith(".m3u8") or "cdn_stream.m3u8" in url.lower()
-        
+
         first_chunk = next(r.iter_content(1024), b"")
         is_m3u8_by_content = first_chunk.startswith(b"#EXTM3U")
         is_playlist = is_m3u8_by_content_type or is_m3u8_by_url or is_m3u8_by_content
@@ -252,7 +251,7 @@ class StreamProxy:
             except Exception:
                 self._send_error(client, 500)
                 return
-            
+
             base = url.rsplit("/", 1)[0] + "/"
             rewritten = self._rewrite_m3u8(text, base, headers)
 
@@ -269,7 +268,7 @@ class StreamProxy:
 
         is_clean = self._is_valid_mp4_start(first_chunk)
         has_garbage = self._has_garbage_prefix(first_chunk)
-        
+
         if has_garbage:
             self._stream_with_cleaning(client, r, first_chunk)
         elif range_header or is_clean:
@@ -280,36 +279,36 @@ class StreamProxy:
     def _stream_direct(self, client, response, first_chunk, range_header):
         try:
             status_code = response.status_code
-            
+
             if status_code == 206:
                 headers = b"HTTP/1.1 206 Partial Content\r\n"
-                
+
                 if "Content-Range" in response.headers:
                     headers += f"Content-Range: {response.headers['Content-Range']}\r\n".encode()
-                
+
                 if "Content-Length" in response.headers:
                     headers += f"Content-Length: {response.headers['Content-Length']}\r\n".encode()
             else:
                 headers = b"HTTP/1.1 200 OK\r\n"
-                
+
                 if "Content-Length" in response.headers:
                     headers += f"Content-Length: {response.headers['Content-Length']}\r\n".encode()
-            
+
             if "Content-Type" in response.headers:
                 headers += f"Content-Type: {response.headers['Content-Type']}\r\n".encode()
             else:
                 headers += b"Content-Type: video/mp4\r\n"
-            
+
             headers += b"Accept-Ranges: bytes\r\n"
             headers += b"Connection: close\r\n\r\n"
-            
+
             client.send(headers)
         except Exception:
             return
 
         try:
             client.send(first_chunk)
-            
+
             for chunk in response.iter_content(16384):
                 if not chunk:
                     continue
@@ -378,46 +377,46 @@ class StreamProxy:
 
     def _rewrite_m3u8(self, content, base, headers):
         out = []
-        
+
         for line in content.splitlines():
             l = line.strip()
-            
+
             if not l:
                 out.append(l)
                 continue
-            
+
             if l.startswith("#") and "URI=" not in l:
                 out.append(l)
                 continue
-            
+
             if l.startswith("#") and "URI=" in l:
                 def rewrite_uri(match):
                     uri = match.group(1)
-                    
+
                     if not uri.startswith("http"):
                         uri = urljoin(base, uri)
-                    
+
                     if headers:
                         h = "&".join(f"{k}={quote(v)}" for k, v in headers.items())
                         uri = f"{uri}|{h}"
-                    
+
                     proxied = self.get_proxy_url(uri)
                     return f'URI="{proxied}"'
-                
+
                 rewritten_line = re.sub(r'URI=["\'](.*?)["\']', rewrite_uri, l)
                 out.append(rewritten_line)
                 continue
-            
+
             if not l.startswith("http"):
                 l = urljoin(base, l)
-            
+
             if headers:
                 h = "&".join(f"{k}={quote(v)}" for k, v in headers.items())
                 l = f"{l}|{h}"
-            
+
             l = self.get_proxy_url(l)
             out.append(l)
-        
+
         return "\n".join(out)
 
     def get_proxy_url(self, url):
@@ -441,7 +440,7 @@ _proxy = None
 
 def get_proxy():
     global _proxy
-    
+
     if _proxy is None:
         _proxy = StreamProxy()
         if not _proxy.start():
@@ -455,5 +454,5 @@ def get_proxy():
             _proxy = StreamProxy()
             if not _proxy.start():
                 return None
-    
+
     return _proxy

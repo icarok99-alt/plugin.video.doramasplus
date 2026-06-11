@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 try:
     from kodi_six import xbmc as xbmc_, xbmcgui as xbmcgui_, xbmcplugin as xbmcplugin_, xbmcaddon as xbmcaddon_, xbmcvfs as xbmcvfs_
 except:
@@ -63,6 +62,26 @@ def yesno(heading="", message="", nolabel="Não", yeslabel="Sim"):
     return q
 
 
+def format_resume_time(seconds):
+    seconds = int(seconds)
+    h = seconds // 3600
+    m = (seconds % 3600) // 60
+    s = seconds % 60
+    if h:
+        return '{:d}:{:02d}:{:02d}'.format(h, m, s)
+    return '{:d}:{:02d}'.format(m, s)
+
+
+def ask_resume(position):
+    time_str = format_resume_time(position)
+    return yesno(
+        heading=addonName,
+        message='Deseja retornar de onde parou {}?'.format(time_str),
+        nolabel='Não',
+        yeslabel='Sim',
+    )
+
+
 def opensettings():
     addon.openSettings()
 
@@ -116,14 +135,12 @@ def string_utf8(string):
 
 
 def to_unicode(text, encoding='utf-8', errors='strict'):
-    """Force text to unicode"""
     if isinstance(text, bytes):
         return text.decode(encoding, errors=errors)
     return text
 
 
 def get_search_string(heading='', message=''):
-    """Ask the user for a search string"""
     search_string = None
     keyboard = xbmc.Keyboard(message, heading)
     keyboard.doModal()
@@ -185,16 +202,14 @@ def addMenuItem(params={}, destiny='', context=[], folder=True):
     mdl_id = params.get("mdl_id", "")
     aired = params.get("aired", "")
     genre = params.get("genre", "")
-    
+
     ep_num = params.get("episode_num", "") or params.get("episode", "")
     year = params.get("year", "")
     mediatype = params.get("mediatype", "video")
     playcount = params.get("playcount", None)
-    resume_time = params.get("resume_time", None)
-    
     li = xbmcgui.ListItem(name)
     li.setArt({"icon": "DefaultVideo.png", "thumb": iconimage})
-    
+
     if kversion > 19:
         info = li.getVideoInfoTag()
         info.setTitle(name)
@@ -207,7 +222,7 @@ def addMenuItem(params={}, destiny='', context=[], folder=True):
         if playcount is not None:
             li.setInfo("video", {"playcount": int(playcount)})
         infotag = False
-    
+
     if year:
         if infotag:
             info.setYear(int(year))
@@ -245,10 +260,6 @@ def addMenuItem(params={}, destiny='', context=[], folder=True):
             li.setInfo('video', {'mediatype': str(mediatype)})
     if playable and folder == False and not playable == 'false':
         li.setProperty('IsPlayable', 'true')
-    if resume_time is not None:
-        position, total = resume_time
-        li.setProperty('ResumeTime', str(int(position)))
-        li.setProperty('TotalTime', str(int(total)))
     if fanart:
         li.setProperty('fanart_image', fanart)
     else:
@@ -274,11 +285,11 @@ def play_video(params):
     episode = params.get("episode", "")
     year = params.get("year", "")
     mediatype = params.get("mediatype", "video")
-    
+
     li = xbmcgui.ListItem(name)
     iconimage = iconimage if iconimage else ''
     li.setArt({"icon": "DefaultVideo.png", "thumb": iconimage})
-    
+
     if kversion > 19:
         info = li.getVideoInfoTag()
         info.setTitle(name)
@@ -287,7 +298,7 @@ def play_video(params):
     else:
         li.setInfo(type="Video", infoLabels={"Title": name, "Plot": description})
         infotag = False
-    
+
     if year:
         if infotag:
             info.setYear(int(year))
@@ -332,7 +343,7 @@ def play_video(params):
         li.setProperty('fanart_image', fanart)
     else:
         li.setProperty('fanart_image', addonFanart)
-    
+
     li.setPath(url)
     if sub:
         li.setSubtitles([sub])

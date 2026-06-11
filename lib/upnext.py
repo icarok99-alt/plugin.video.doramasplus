@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import threading
 import time
 
@@ -11,26 +10,26 @@ _addon = xbmcaddon.Addon()
 
 class UpNextDialog(xbmcgui.WindowXMLDialog):
 
-    BTN_PLAY   = 3001
+    BTN_PLAY = 3001
     BTN_CANCEL = 3002
-    LBL_NEXT   = 3003
-    IMG_THUMB  = 3004
-    PROGRESS   = 3005
+    LBL_NEXT = 3003
+    IMG_THUMB = 3004
+    PROGRESS = 3005
 
     def __init__(self, *args, **kwargs):
-        self.next_info       = kwargs.get('next_info', {})
-        self.countdown_secs  = kwargs.get('countdown_secs', 10)
-        self.auto_play       = False
-        self.cancelled       = False
-        self._stop           = False
-        self._thread         = None
-        self.player          = xbmc.Player()
+        self.next_info = kwargs.get('next_info', {})
+        self.countdown_secs = kwargs.get('countdown_secs', 10)
+        self.auto_play = False
+        self.cancelled = False
+        self._stop = False
+        self._thread = None
+        self.player = xbmc.Player()
 
     def onInit(self):
         try:
-            ep_num   = self.next_info.get('ep_num', '')
+            ep_num = self.next_info.get('ep_num', '')
             ep_title = self.next_info.get('ep_title', '')
-            thumb    = self.next_info.get('ep_img', '')
+            thumb = self.next_info.get('ep_img', '')
 
             label = ep_title or ''
             self.getControl(self.LBL_NEXT).setLabel(label)
@@ -109,13 +108,13 @@ class UpNextDialog(xbmcgui.WindowXMLDialog):
 class UpNextService:
 
     def __init__(self, player):
-        self.player       = player
-        self._lock        = threading.Lock()
-        self._stop        = False
-        self._monitoring  = False
-        self._thread      = None
+        self.player = player
+        self._lock = threading.Lock()
+        self._stop = False
+        self._monitoring = False
+        self._thread = None
         self._dialog_shown = False
-        self._dialog_lock  = threading.Lock()
+        self._dialog_lock = threading.Lock()
 
     @staticmethod
     def _get_bool(addon, key, default=True):
@@ -138,9 +137,9 @@ class UpNextService:
 
     def _get_settings(self):
         addon = xbmcaddon.Addon()
-        enabled   = self._get_bool(addon, 'upnext_enabled')
+        enabled = self._get_bool(addon, 'upnext_enabled')
         countdown = self._get_int(addon, 'upnext_countdown', 10, 5)
-        trigger   = self._get_int(addon, 'upnext_trigger', 30, 10)
+        trigger = self._get_int(addon, 'upnext_trigger', 30, 10)
         return enabled, countdown, trigger
 
     def start_monitoring(self, mdl_id, ep_num, serie_title, next_info):
