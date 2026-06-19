@@ -206,7 +206,6 @@ def play_dorama(param):
     iconimage = param.get('iconimage', '')
     fanart = param.get('fanart', '')
     description = param.get('description', '')
-    year = param.get('year', '')
     mdl_id = param.get('mdl_id', '')
 
     resume_time = None
@@ -276,31 +275,13 @@ def play_dorama(param):
             tag = play_item.getVideoInfoTag()
             tag.setTitle(episode_title or serie_title)
             tag.setPlot(description)
-            tag.setMediaType('episode')
-            if year and year != '0':
-                try:
-                    tag.setYear(int(year))
-                except Exception:
-                    pass
-            tag.setTvShowTitle(serie_title)
-            tag.setOriginalTitle(serie_title)
-            tag.setSeason(1)
-            tag.setEpisode(episode_num)
+            tag.setMediaType('video')
         else:
             info = {
                 'title': episode_title or serie_title,
                 'plot': description,
-                'mediatype': 'episode',
-                'tvshowtitle': serie_title,
-                'originaltitle': serie_title,
-                'season': 1,
-                'episode': episode_num,
+                'mediatype': 'video',
             }
-            if year and year != '0':
-                try:
-                    info['year'] = int(year)
-                except Exception:
-                    pass
             play_item.setInfo('video', info)
 
         xbmcplugin.setResolvedUrl(int(sys.argv[1]), True, play_item)
@@ -313,34 +294,34 @@ def play_dorama(param):
                     playlist = xbmc.PlayList(xbmc.PLAYLIST_VIDEO)
                     kv = int(xbmc.getInfoLabel('System.BuildVersion').split('.')[0])
                     addon_id = plugin.split('/')[2]
+                    from urllib.parse import urlencode, quote_plus
                     for ep in episodes:
                         ep_num = ep.get('ep_num', 0)
                         if ep_num <= episode_num:
                             continue
-                        ep_title = ep.get('ep_title') or f'Episode {ep_num}'
+                        ep_title = ep.get('ep_title') or f'Episódio {ep_num}'
                         ep_img = ep.get('ep_img') or iconimage
+                        ep_score = ep.get('ep_score') or ''
+                        playlist_label = f'[COLOR gold]★ {ep_score}[/COLOR]  {ep_title}' if ep_score else ep_title
                         ep_params = {
-                            'serie_title':   serie_title,
-                            'episode_num':   str(ep_num),
+                            'serie_title': serie_title,
+                            'episode_num': str(ep_num),
                             'episode_title': ep_title,
-                            'iconimage':     ep_img,
-                            'description':   ep.get('ep_desc', ''),
-                            'mdl_id':        mdl_id,
+                            'iconimage': ep_img,
+                            'description': ep.get('ep_desc', ''),
+                            'mdl_id': mdl_id,
                         }
-                        from urllib.parse import urlencode, quote_plus
                         purl = f'plugin://{addon_id}/play_dorama/{quote_plus(urlencode(ep_params))}'
-                        li = xbmcgui.ListItem(ep_title)
+                        li = xbmcgui.ListItem(playlist_label)
                         li.setArt({'thumb': ep_img, 'icon': ep_img})
                         if kv >= 20:
                             t = li.getVideoInfoTag()
-                            t.setTitle(ep_title)
-                            t.setTvShowTitle(serie_title)
-                            t.setMediaType('episode')
-                            t.setEpisode(ep_num)
+                            t.setTitle(playlist_label)
+                            t.setMediaType('video')
                         else:
                             li.setInfo('video', {
-                                'title': ep_title, 'tvshowtitle': serie_title,
-                                'mediatype': 'episode', 'episode': ep_num,
+                                'title': playlist_label,
+                                'mediatype': 'video',
                             })
                         playlist.add(url=purl, listitem=li)
             except Exception:
@@ -350,7 +331,7 @@ def play_dorama(param):
         next_info = (
             {'ep_num': next_ep['ep_num'],
              'ep_title': next_ep.get('ep_title', ''),
-             'ep_img':   next_ep.get('ep_img', '')}
+             'ep_img': next_ep.get('ep_img', '')}
             if next_ep else None
         )
         threading.Thread(
