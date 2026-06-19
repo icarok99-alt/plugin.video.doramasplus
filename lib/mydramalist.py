@@ -207,8 +207,7 @@ def get_episodes(mdl_id):
                 ep_num = int(m.group(1))
 
             raw = a_tag.get_text(strip=True) if a_tag else ''
-            m_ep = re.search(r'(Episode\s+\d+.*)', raw)
-            title = m_ep.group(1).strip() if m_ep else 'Episode {}'.format(ep_num)
+            title = raw if raw else 'Episode {}'.format(ep_num)
 
             desc_div = ep_div.select_one('div.summary')
             description = ''

@@ -204,7 +204,6 @@ def addMenuItem(params={}, destiny='', context=[], folder=True):
     aired = params.get("aired", "")
     genre = params.get("genre", "")
 
-    ep_num = params.get("episode_num", "") or params.get("episode", "")
     year = params.get("year", "")
     mediatype = params.get("mediatype", "video")
     playcount = params.get("playcount", None)
@@ -249,11 +248,6 @@ def addMenuItem(params={}, destiny='', context=[], folder=True):
             info.setGenres([str(genre)])
         else:
             li.setInfo('video', {'genre': str(genre)})
-    if ep_num:
-        if infotag:
-            info.setEpisode(int(ep_num))
-        else:
-            li.setInfo('video', {'episode': int(ep_num)})
     if mediatype:
         if infotag:
             info.setMediaType(str(mediatype))
