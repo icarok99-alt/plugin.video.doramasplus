@@ -13,50 +13,81 @@ class _Monitor(xbmc.Player):
 
     def __init__(self):
         super().__init__()
-        self._e = threading.Event()
+        self._av_ready = threading.Event()
+        self._failed = threading.Event()
         self._armed = False
         self._lock = threading.Lock()
 
     def onAVStarted(self):
         with self._lock:
             if self._armed:
-                self._e.set()
+                self._av_ready.set()
 
     def onPlayBackError(self):
         with self._lock:
             if self._armed:
-                self._e.set()
+                self._failed.set()
 
     def onPlayBackStopped(self):
         with self._lock:
             if self._armed:
-                self._e.set()
+                self._failed.set()
 
     def reset(self):
         with self._lock:
-            self._e.clear()
+            self._av_ready.clear()
+            self._failed.clear()
             self._armed = True
 
     def disarm(self):
         with self._lock:
             self._armed = False
-            self._e.set()
+            self._failed.set()
 
     def wait(self, timeout: float = 45.0) -> bool:
         mon = xbmc.Monitor()
-        elapsed = 0.0
-        while elapsed < timeout:
-            if self._e.is_set():
-                return True
+        deadline = time.monotonic() + timeout
+
+        phase1_ok = False
+        while time.monotonic() < deadline:
+            if self._failed.is_set() or mon.abortRequested():
+                return False
+            if self._av_ready.is_set():
+                phase1_ok = True
+                break
             try:
-                if self.isPlaying() and self.getTime() > 0:
-                    return True
+                if self.isPlaying() and self.getTime() > 0.0:
+                    phase1_ok = True
+                    break
             except Exception:
                 pass
-            if mon.waitForAbort(0.25):
+            mon.waitForAbort(0.1)
+
+        if not phase1_ok:
+            return False
+
+        last_pos = -1.0
+        confirm_deadline = min(time.monotonic() + 0.4, deadline)
+
+        while time.monotonic() < confirm_deadline:
+            if self._failed.is_set() or mon.abortRequested():
                 return False
-            elapsed += 0.25
-        return False
+            try:
+                if not self.isPlaying():
+                    return False
+                pos = self.getTime()
+            except Exception:
+                mon.waitForAbort(0.1)
+                continue
+            if last_pos >= 0.0 and pos > last_pos:
+                return True
+            last_pos = pos
+            mon.waitForAbort(0.1)
+
+        try:
+            return self._av_ready.is_set() and self.isPlaying() and self.getTime() >= 0.0
+        except Exception:
+            return self._av_ready.is_set()
 
 
 class LoadingManager:
@@ -193,20 +224,8 @@ class LoadingManager:
             self._clear_props()
 
     def _wait_close(self):
-        mon = xbmc.Monitor()
-        elapsed = 0.0
-        while elapsed < self._PLAYER_TIMEOUT:
-            self._ensure_anim()
-            if self._player_mon._e.is_set():
-                break
-            try:
-                if self._player_mon.isPlaying() and self._player_mon.getTime() > 0:
-                    break
-            except Exception:
-                pass
-            if mon.waitForAbort(0.25):
-                break
-            elapsed += 0.25
+        self._ensure_anim()
+        self._player_mon.wait(timeout=self._PLAYER_TIMEOUT)
         self._do_close()
 
     def _do_close(self):
